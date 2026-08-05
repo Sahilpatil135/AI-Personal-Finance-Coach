@@ -1,10 +1,23 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import api from './services/api'
 
-function App() {  
+function App() {
+
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    api.get("/")
+      .then((response) => {
+        setMessage(response.data.message);
+      })
+      .catch((error) => {
+        console.error("Error fetching message:", error);
+      });
+  }, []);
 
   return (
     <>
-      <h1>hi</h1>
+      <h1>{message}</h1>
     </>
   )
 }
