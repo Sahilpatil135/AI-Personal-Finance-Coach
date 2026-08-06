@@ -3,6 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 
+from app.database.database import Base, engine
+
+from app.models import User, Income, Expense, Goal
+
+Base.metadata.create_all(bind=engine)
+
 app = FastAPI()
 
 load_dotenv()
