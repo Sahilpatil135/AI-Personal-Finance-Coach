@@ -8,6 +8,7 @@ from app.database.database import Base, engine
 from app.models import User, Income, Expense, Goal
 
 from app.api import auth
+from app.api import income
 
 Base.metadata.create_all(bind=engine)
 
@@ -28,6 +29,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(income.router)
 
 @app.get("/")
 def home():
