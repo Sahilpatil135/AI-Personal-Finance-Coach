@@ -19,3 +19,4 @@ class User(Base):
     incomes = relationship("Income", back_populates="user", cascade="all, delete")
     expenses = relationship("Expense", back_populates="user", cascade="all, delete")
     goals = relationship("Goal", back_populates="user", cascade="all, delete")
+    investments = relationship("Investment", back_populates="user", cascade="all, delete")

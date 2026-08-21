@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Date
+from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, Date
 from sqlalchemy.orm import relationship
 from app.database.database import Base
 
@@ -7,9 +7,10 @@ class Goal(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     goal_name = Column(String, nullable=False)
-    target_amount = Column(Float, nullable=False)
-    current_saved = Column(Float, default=0.0)
+    target_amount = Column(Numeric(12, 2), nullable=False)
+    current_saved = Column(Numeric(12, 2), default=0.00)
     deadline = Column(Date)
     status = Column(String, default="In Progress")  # e.g., In Progress, Completed, Failed
 
     user = relationship("User", back_populates="goals")
+    investments = relationship("Investment", back_populates="goal")
