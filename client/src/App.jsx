@@ -2,9 +2,11 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import PublicRoute from "./components/PublicRoute";
+import ProtectedLayout from "./components/ProtectedLayout";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
+import Income from "./pages/Income";
 import { Toaster } from "react-hot-toast";
 
 function App() {
@@ -33,7 +35,10 @@ function App() {
 
           {/* Protected Authenticated Routes */}
           <Route element={<ProtectedRoute />}>
-            <Route path="/dashboard" element={<Dashboard />} />
+            <Route element={<ProtectedLayout />} >
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/income" element={<Income />} />
+            </Route>
           </Route>
 
           {/* Fallback Route */}

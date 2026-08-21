@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Date
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, Date, Text
 from sqlalchemy.orm import relationship
 from datetime import date
 from app.database.database import Base
@@ -9,6 +9,7 @@ class Income(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     amount = Column(Float, nullable=False)
     source = Column(String, nullable=False)
-    date = Column(Date, default= date.today)
+    date = Column(Date, default=date.today)
+    description = Column(Text, nullable=True)
 
     user = relationship("User", back_populates="incomes")
