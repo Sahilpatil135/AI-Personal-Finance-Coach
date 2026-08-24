@@ -68,3 +68,9 @@ src/
 ## 🔐 API Key Security
 
 Your Gemini API key is stored in the `.env` file. It is **NOT** committed to version control. Always ensure that `.env` is included in your `.gitignore` file.
+
+## How To Run The Project
+
+1. On First Terminal Enter:- cd server -> venv/Scripts/activate -> uvicorn app.main:app --reload
+
+2. On Second Terminal Enter:- cd client -> npm run dev

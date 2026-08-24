@@ -3,7 +3,7 @@ from sqlalchemy import func, and_
 from fastapi import HTTPException, status
 from app.models.income import Income
 from app.schemas.income import IncomeCreate, IncomeUpdate
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from calendar import monthrange
 
 def create_income(db: Session, income_data: IncomeCreate, user_id: int) -> Income:
