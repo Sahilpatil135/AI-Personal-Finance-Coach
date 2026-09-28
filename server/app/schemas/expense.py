@@ -6,6 +6,7 @@ class ExpenseCreate(BaseModel):
     amount: float
     category: str
     description: Optional[str] = None
+    payment_mode: str = "Online/UPI"
     date: Optional[date_type] = None
 
 class ExpenseResponse(BaseModel):
@@ -13,6 +14,7 @@ class ExpenseResponse(BaseModel):
     amount: float
     category: str
     description: Optional[str] = None
+    payment_mode: str = "Online/UPI"
     date: Optional[date_type] = None
 
     class Config:
@@ -22,6 +24,7 @@ class ExpenseUpdate(BaseModel):
     amount: Optional[float] = None
     category: Optional[str] = None
     description: Optional[str] = None
+    payment_mode: Optional[str] = None
     date: Optional[date_type] = None
 
 class ExpenseStats(BaseModel):
@@ -30,6 +33,7 @@ class ExpenseStats(BaseModel):
     mom_growth: float
     primary_category: str
     category_count: int
+    largest_expense: float
 
 class MonthlyTrend(BaseModel):
     month: str
@@ -39,4 +43,10 @@ class CategoryDistribution(BaseModel):
     category: str
     amount: float
     percentage: float
+
+class BudgetResponse(BaseModel):
+    amount: float
+
+class BudgetUpdate(BaseModel):
+    amount: float
 

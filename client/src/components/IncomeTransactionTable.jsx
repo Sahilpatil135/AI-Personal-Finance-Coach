@@ -91,7 +91,7 @@ const IncomeTransactionTable = ({
         <select
           value={sourceFilter}
           onChange={(e) => setSourceFilter(e.target.value)}
-          className="px-4 py-2 bg-slate-950/70 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="px-4 py-2 bg-slate-950/70 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
         >
           <option value="">All Sources</option>
           {uniqueSources.map(source => (

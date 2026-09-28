@@ -58,31 +58,31 @@ def get_income_stats(db: Session, user_id: int):
     current_month_start = date(today.year, today.month, 1)
     
     # Total income
-    total_income = db.query(func.sum(Income.amount)).filter(
+    total_income = float( db.query(func.sum(Income.amount)).filter(
         Income.user_id == user_id
-    ).scalar() or 0.0
-    
+    ).scalar() or 0.0 )
+
     # Current month total
-    month_total = db.query(func.sum(Income.amount)).filter(
+    month_total = float( db.query(func.sum(Income.amount)).filter(
         and_(
             Income.user_id == user_id,
             Income.date >= current_month_start,
             Income.date <= today
         )
-    ).scalar() or 0.0
-    
+    ).scalar() or 0.0 )
+
     # Previous month total
     prev_month_start = current_month_start - timedelta(days=1)
     prev_month_start = date(prev_month_start.year, prev_month_start.month, 1)
     prev_month_end = current_month_start - timedelta(days=1)
     
-    prev_month_total = db.query(func.sum(Income.amount)).filter(
+    prev_month_total = float( db.query(func.sum(Income.amount)).filter(
         and_(
             Income.user_id == user_id,
             Income.date >= prev_month_start,
             Income.date <= prev_month_end
         )
-    ).scalar() or 0.0
+    ).scalar() or 0.0 )
     
     # Month-over-month growth
     mom_growth = 0.0

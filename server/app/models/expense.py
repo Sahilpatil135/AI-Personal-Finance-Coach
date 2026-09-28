@@ -10,6 +10,7 @@ class Expense(Base):
     amount = Column(Numeric(12, 2), nullable=False)
     category = Column(String, nullable=False)
     description = Column(String)
+    payment_mode = Column(String, nullable=False, default="Online/UPI")
     date = Column(Date, default=date.today)
 
     user = relationship("User", back_populates="expenses")

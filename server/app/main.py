@@ -13,6 +13,12 @@ from app.api import expense
 
 Base.metadata.create_all(bind=engine)
 
+# Keep existing installations compatible with the new expense fields.
+with engine.begin() as connection:
+    connection.exec_driver_sql(
+        "ALTER TABLE expenses ADD COLUMN IF NOT EXISTS payment_mode VARCHAR DEFAULT 'Online/UPI'"
+    )
+
 app = FastAPI(title="AI Personal Finance Coach API", version="1.0.0")
 
 load_dotenv()

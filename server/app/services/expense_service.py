@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from fastapi import HTTPException, status
 from app.models.expense import Expense
+from app.models.budget import Budget
 from app.schemas.expense import ExpenseCreate, ExpenseUpdate
 from datetime import date, timedelta
 from calendar import monthrange
@@ -11,6 +12,7 @@ def create_expense(db: Session, expense_data: ExpenseCreate, user_id: int) -> Ex
         amount=expense_data.amount,
         category=expense_data.category,
         description=expense_data.description,
+        payment_mode=expense_data.payment_mode,
         date=expense_data.date,
         user_id=user_id
     )
@@ -40,6 +42,8 @@ def update_expense(db: Session, expense_id: int, user_id: int, expense_data: Exp
         expense.category = expense_data.category
     if expense_data.description is not None:
         expense.description = expense_data.description
+    if expense_data.payment_mode is not None:
+        expense.payment_mode = expense_data.payment_mode
     if expense_data.date is not None:
         expense.date = expense_data.date
 
@@ -57,11 +61,17 @@ def get_expense_stats(db: Session, user_id: int):
     today = date.today()
     current_month_start = date(today.year, today.month, 1)
     
-    # Total expense
+    year_start = date(today.year, 1, 1)
     total_expense = db.query(func.sum(Expense.amount)).filter(Expense.user_id == user_id).scalar() or 0.0
     
     # Monthly total expense
     month_total = db.query(func.sum(Expense.amount)).filter(
+        Expense.user_id == user_id,
+        Expense.date >= current_month_start,
+        Expense.date <= today
+    ).scalar() or 0.0
+
+    largest_expense = db.query(func.max(Expense.amount)).filter(
         Expense.user_id == user_id,
         Expense.date >= current_month_start,
         Expense.date <= today
@@ -95,12 +105,27 @@ def get_expense_stats(db: Session, user_id: int):
     ).scalar() or 0
     
     return {
-        "total_expense": float(total_expense),
+        "total_expense": float(db.query(func.sum(Expense.amount)).filter(
+            Expense.user_id == user_id, Expense.date >= year_start, Expense.date <= today
+        ).scalar() or 0.0),
         "month_total": float(month_total),
         "mom_growth": float(mom_growth),
         "primary_category": primary_category,
-        "category_count": category_count
+        "category_count": category_count,
+        "largest_expense": float(largest_expense)
     }
+
+def get_expense_trends(db: Session, user_id: int, timeframe: str = "year"):
+    if timeframe == "month":
+        today = date.today()
+        first_day = date(today.year, today.month, 1)
+        return [
+            {"month": day.strftime("%d %b"), "amount": float(db.query(func.sum(Expense.amount)).filter(
+                Expense.user_id == user_id, Expense.date == day
+            ).scalar() or 0.0)}
+            for day in (first_day + timedelta(days=index) for index in range((today - first_day).days + 1))
+        ]
+    return get_monthly_expense_trends(db, user_id, 12)
 
 def get_monthly_expense_trends(db: Session, user_id: int, months: int = 12):
     """Get monthly expense trends for the past N months."""
@@ -142,12 +167,19 @@ def get_monthly_expense_trends(db: Session, user_id: int, months: int = 12):
     
     return trends
 
-def get_category_distribution(db: Session, user_id: int):
+def get_category_distribution(db: Session, user_id: int, timeframe: str = "year"):
     """Get distribution of expenses by category."""
-    results = db.query(
+    start_date = None
+    if timeframe == "month":
+        today = date.today()
+        start_date = date(today.year, today.month, 1)
+    query = db.query(
         Expense.category,
         func.sum(Expense.amount).label('total')
-    ).filter(Expense.user_id == user_id).group_by(Expense.category).all()
+    ).filter(Expense.user_id == user_id)
+    if start_date:
+        query = query.filter(Expense.date >= start_date, Expense.date <= date.today())
+    results = query.group_by(Expense.category).all()
 
     total = sum(r[1] for r in results)
     distribution = []
@@ -160,6 +192,19 @@ def get_category_distribution(db: Session, user_id: int):
         })
 
     return sorted(distribution, key=lambda x: x['amount'], reverse=True)
+
+def get_budget(db: Session, user_id: int):
+    budget = db.query(Budget).filter(Budget.user_id == user_id).first()
+    return {"amount": float(budget.amount) if budget else 0.0}
+
+def set_budget(db: Session, user_id: int, amount: float):
+    budget = db.query(Budget).filter(Budget.user_id == user_id).first()
+    if budget:
+        budget.amount = amount
+    else:
+        db.add(Budget(user_id=user_id, amount=amount))
+    db.commit()
+    return get_budget(db, user_id)
 
 def get_paginated_expenses(db: Session, user_id: int, skip: int = 0, limit: int = 10):
     """Get sorted paginated list of expenses for a user."""

@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends, Query, status
 from app.models.user import User
 from sqlalchemy.orm import Session
 from app.database.database import get_db
-from app.schemas.expense import ExpenseCreate, ExpenseUpdate, ExpenseResponse, ExpenseStats, MonthlyTrend, CategoryDistribution
+from app.schemas.expense import ExpenseCreate, ExpenseUpdate, ExpenseResponse, ExpenseStats, MonthlyTrend, CategoryDistribution, BudgetResponse, BudgetUpdate
 from app.services.expense_service import (
     create_expense, get_user_expenses, update_expense, delete_expense,
-    get_expense_stats, get_monthly_expense_trends, get_category_distribution, get_paginated_expenses
+    get_expense_stats, get_monthly_expense_trends, get_expense_trends, get_category_distribution, get_paginated_expenses, get_budget, set_budget
 )
 from app.auth.dependencies import get_current_user
 
@@ -26,14 +26,23 @@ def get_stats(db: Session = Depends(get_db), current_user: User = Depends(get_cu
 @router.get("/analytics/monthly-trends", response_model=list[MonthlyTrend], status_code=status.HTTP_200_OK)
 def get_monthly_trends_endpoint(
     months: int = Query(12, ge=1, le=36),
+    timeframe: str = Query("year", pattern="^(month|year)$"),
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
-    return get_monthly_expense_trends(db=db, user_id=current_user.id, months=months)
+    return get_expense_trends(db=db, user_id=current_user.id, timeframe=timeframe)
 
 @router.get("/analytics/category-distribution", response_model=list[CategoryDistribution], status_code=status.HTTP_200_OK)
-def get_distribution(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return get_category_distribution(db=db, user_id=current_user.id)
+def get_distribution(timeframe: str = Query("year", pattern="^(month|year)$"), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return get_category_distribution(db=db, user_id=current_user.id, timeframe=timeframe)
+
+@router.get("/budget", response_model=BudgetResponse)
+def get_current_budget(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return get_budget(db=db, user_id=current_user.id)
+
+@router.put("/budget", response_model=BudgetResponse)
+def update_current_budget(budget_data: BudgetUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return set_budget(db=db, user_id=current_user.id, amount=budget_data.amount)
 
 @router.get("/paginated", status_code=status.HTTP_200_OK)
 def get_paginated(

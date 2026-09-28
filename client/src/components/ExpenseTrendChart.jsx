@@ -1,0 +1,4 @@
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
+export default function ExpenseTrendChart({ data }) {
+  return <section className="rounded-xl border border-slate-800 bg-slate-900 p-5"><h2 className="mb-4 text-lg font-bold">Expense Trend</h2>{data.length ? <ResponsiveContainer width="100%" height={280}><BarChart data={data}><CartesianGrid stroke="#263244" strokeDasharray="3 3" /><XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 11 }} /><YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} /><Tooltip formatter={(value) => `₹${Number(value).toLocaleString('en-IN')}`} /><Bar dataKey="amount" fill="#f43f5e" radius={[5, 5, 0, 0]} /></BarChart></ResponsiveContainer> : <div className="flex h-[280px] items-center justify-center text-slate-500">No expenses in this period</div>}</section>
+}

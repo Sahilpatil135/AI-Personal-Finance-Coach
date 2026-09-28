@@ -123,7 +123,7 @@ const Income = () => {
               setEditingIncome(null)
               setIsFormOpen(true)
             }}
-            className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold py-2 px-4 rounded-xl flex items-center gap-2 transition shadow-lg shadow-emerald-500/20"
+            className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold py-2 px-4 rounded-xl flex items-center gap-2 transition shadow-lg shadow-emerald-500/20 cursor-pointer"
           >
             <FiPlus size={20} />
             Add Income
