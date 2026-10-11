@@ -1,0 +1,5 @@
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts'
+const colors = ['#f43f5e', '#f59e0b', '#38bdf8', '#a78bfa', '#34d399', '#fb7185', '#60a5fa', '#94a3b8']
+export default function ExpenseCategoryChart({ data }) {
+  return <section className="rounded-xl border border-slate-800 bg-slate-900 p-5"><h2 className="mb-4 text-lg font-bold">Spending by Category</h2>{data.length ? <ResponsiveContainer width="100%" height={280}><PieChart><Pie data={data} dataKey="amount" nameKey="category" innerRadius={62} outerRadius={95} paddingAngle={3}>{data.map((item, index) => <Cell key={item.category} fill={colors[index % colors.length]} />)}</Pie><Tooltip formatter={(value) => `₹${Number(value).toLocaleString('en-IN')}`} /><Legend wrapperStyle={{ color: '#cbd5e1', fontSize: 12 }} /></PieChart></ResponsiveContainer> : <div className="flex h-[280px] items-center justify-center text-slate-500">No categories in this period</div>}</section>
+}
