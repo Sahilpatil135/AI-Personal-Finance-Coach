@@ -63,18 +63,18 @@ const Dashboard = () => {
             </Link>
           </div>
 
-          <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 hover:border-slate-700/80 transition-all">
+          <Link to="/investment" className="block bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 hover:border-slate-700/80 transition-all">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active Goals</span>
-              <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center text-teal-400">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Investments</span>
+              <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-300">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
             </div>
-            <p className="text-2xl font-bold text-white">0 Goals</p>
-            <p className="text-xs text-slate-500 mt-1">Set your first savings target</p>
-          </div>
+            <p className="text-2xl font-bold text-white">Track portfolio</p>
+            <p className="text-xs text-slate-500 mt-1">View investment performance and upcoming contributions</p>
+          </Link>
         </div>
 
         {/* AI Assistant Callout */}

@@ -1,56 +1,60 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import toast from 'react-hot-toast'
-import { FiPlus } from 'react-icons/fi'
-import { incomeService } from '../services/incomeService'
-import KPICards from '../components/KPICards'
-import IncomeEntryForm from '../components/IncomeEntryForm'
-import MonthlyTrendChart from '../components/MonthlyTrendChart'
-import SourceDistributionChart from '../components/SourceDistributionChart'
-import IncomeTransactionTable from '../components/IncomeTransactionTable'
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
+import { FiPlus, FiDollarSign } from "react-icons/fi";
+import { incomeService } from "../services/incomeService";
+import KPICards from "../components/KPICards";
+import IncomeEntryForm from "../components/IncomeEntryForm";
+import MonthlyTrendChart from "../components/MonthlyTrendChart";
+import SourceDistributionChart from "../components/SourceDistributionChart";
+import IncomeTransactionTable from "../components/IncomeTransactionTable";
 
 const Income = () => {
-  const [stats, setStats] = useState(null)
-  const [monthlyTrends, setMonthlyTrends] = useState([])
-  const [sourceDistribution, setSourceDistribution] = useState([])
-  const [incomes, setIncomes] = useState([])
-  const [isFormOpen, setIsFormOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalItems, setTotalItems] = useState(0)
-  const [editingIncome, setEditingIncome] = useState(null)
-  const pageSize = 10
-  const navigate = useNavigate()
+  const [stats, setStats] = useState(null);
+  const [monthlyTrends, setMonthlyTrends] = useState([]);
+  const [sourceDistribution, setSourceDistribution] = useState([]);
+  const [incomes, setIncomes] = useState([]);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [editingIncome, setEditingIncome] = useState(null);
+  const pageSize = 10;
+  const navigate = useNavigate();
 
   // Fetch all data
   const fetchData = async () => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
       // Fetch stats, trends, and distribution in parallel
-      const [statsData, trendsData, distributionData, paginatedData] = await Promise.all([
-        incomeService.getIncomeStats(),
-        incomeService.getMonthlyTrends(12),
-        incomeService.getSourceDistribution(),
-        incomeService.getPaginatedIncome((currentPage - 1) * pageSize, pageSize)
-      ])
+      const [statsData, trendsData, distributionData, paginatedData] =
+        await Promise.all([
+          incomeService.getIncomeStats(),
+          incomeService.getMonthlyTrends(12),
+          incomeService.getSourceDistribution(),
+          incomeService.getPaginatedIncome(
+            (currentPage - 1) * pageSize,
+            pageSize,
+          ),
+        ]);
 
-      setStats(statsData)
-      setMonthlyTrends(trendsData)
-      setSourceDistribution(distributionData)
-      setIncomes(paginatedData.records)
-      setTotalItems(paginatedData.total)
+      setStats(statsData);
+      setMonthlyTrends(trendsData);
+      setSourceDistribution(distributionData);
+      setIncomes(paginatedData.records);
+      setTotalItems(paginatedData.total);
     } catch (error) {
-      console.error('Error fetching data:', error)
-      toast.error('Failed to fetch income data')
+      console.error("Error fetching data:", error);
+      toast.error("Failed to fetch income data");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   // Initial fetch
   useEffect(() => {
-    fetchData()
-  }, [currentPage])
+    fetchData();
+  }, [currentPage]);
 
   // Handle form submission
   const handleAddIncome = async (formData) => {
@@ -62,66 +66,82 @@ const Income = () => {
           parseFloat(formData.amount),
           formData.source,
           formData.date,
-          formData.description
-        )
-        toast.success('Income updated successfully!')
-        setEditingIncome(null)
+          formData.description,
+        );
+        toast.success("Income updated successfully!");
+        setEditingIncome(null);
       } else {
         // Create new income
         await incomeService.addIncome(
           parseFloat(formData.amount),
           formData.source,
           formData.date,
-          formData.description
-        )
-        toast.success('Income added successfully!')
+          formData.description,
+        );
+        toast.success("Income added successfully!");
       }
-      setCurrentPage(1)
-      await fetchData()
+      setCurrentPage(1);
+      await fetchData();
     } catch (error) {
-      throw error
+      throw error;
     }
-  }
+  };
 
   // Handle edit
   const handleEdit = (income) => {
-    setEditingIncome(income)
-    setIsFormOpen(true)
-  }
+    setEditingIncome(income);
+    setIsFormOpen(true);
+  };
 
   // Handle delete
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this income record?')) {
+    if (window.confirm("Are you sure you want to delete this income record?")) {
       try {
-        await incomeService.deleteIncome(id)
-        toast.success('Income deleted successfully!')
-        setCurrentPage(1)
-        await fetchData()
+        await incomeService.deleteIncome(id);
+        toast.success("Income deleted successfully!");
+        setCurrentPage(1);
+        await fetchData();
       } catch (error) {
-        toast.error('Failed to delete income')
+        toast.error("Failed to delete income");
       }
     }
-  }
+  };
 
   // Handle form close
   const handleCloseForm = () => {
-    setIsFormOpen(false)
-    setEditingIncome(null)
-  }
+    setIsFormOpen(false);
+    setEditingIncome(null);
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 p-6 text-slate-100 font-sans">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <div>
+          {/* <div>
             <h1 className="text-3xl font-bold">Income Tracker</h1>
             <p className="text-slate-400 mt-1">Manage and track all your income sources</p>
+          </div> */}
+          <div className="flex items-center gap-4">
+            <div className="rounded-xl bg-emerald-500/10 p-3 text-emerald-400">
+              <FiDollarSign size={24} />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300/80">
+                Track your earnings
+              </p>
+              <h1 className="mt-1 text-2xl font-bold text-white sm:text-3xl">
+                Income Tracker
+              </h1>
+              <p className="mt-1 text-sm text-slate-400">
+                Manage and track all your income sources
+              </p>
+            </div>
           </div>
           <button
             onClick={() => {
-              setEditingIncome(null)
-              setIsFormOpen(true)
+              setEditingIncome(null);
+              setIsFormOpen(true);
             }}
             className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold py-2 px-4 rounded-xl flex items-center gap-2 transition shadow-lg shadow-emerald-500/20 cursor-pointer"
           >
@@ -160,7 +180,7 @@ const Income = () => {
         />
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Income
+export default Income;

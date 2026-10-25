@@ -1,5 +1,6 @@
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
+import { NavLink } from 'react-router-dom'
 
 const Navbar = () => {
     const { user, logout } = useAuth();
@@ -22,6 +23,22 @@ const Navbar = () => {
                     </div>
 
                     <div className="flex items-center gap-4">
+                        <nav aria-label="Main navigation" className="hidden items-center gap-1 lg:flex">
+                            {[
+                                ['Dashboard', '/dashboard'],
+                                ['Income', '/income'],
+                                ['Expenses', '/expense'],
+                                ['Investments', '/investment'],
+                            ].map(([label, path]) => (
+                                <NavLink
+                                    key={path}
+                                    to={path}
+                                    className={({ isActive }) => `rounded-lg px-3 py-2 text-sm font-medium transition ${isActive ? 'bg-slate-800 text-amber-300' : 'text-slate-400 hover:bg-slate-800/70 hover:text-white'}`}
+                                >
+                                    {label}
+                                </NavLink>
+                            ))}
+                        </nav>
                         <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-800/60 rounded-full border border-slate-700/50 text-xs text-slate-300">
                             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
                             <span>{user?.email}</span>
@@ -37,6 +54,22 @@ const Navbar = () => {
                         </button>
                     </div>
                 </div>
+                <nav aria-label="Main navigation" className="flex gap-1 overflow-x-auto border-t border-slate-800/70 px-4 py-2 lg:hidden">
+                    {[
+                        ['Dashboard', '/dashboard'],
+                        ['Income', '/income'],
+                        ['Expenses', '/expense'],
+                        ['Investments', '/investment'],
+                    ].map(([label, path]) => (
+                        <NavLink
+                            key={path}
+                            to={path}
+                            className={({ isActive }) => `shrink-0 rounded-lg px-3 py-2 text-xs font-medium transition ${isActive ? 'bg-slate-800 text-amber-300' : 'text-slate-400 hover:bg-slate-800/70 hover:text-white'}`}
+                        >
+                            {label}
+                        </NavLink>
+                    ))}
+                </nav>
             </header>
         </div>
     )

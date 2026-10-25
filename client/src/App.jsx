@@ -8,6 +8,7 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Income from "./pages/Income";
 import Expense from "./pages/Expense";
+import Investment from "./pages/Investment";
 import { Toaster } from "react-hot-toast";
 
 function App() {
@@ -40,6 +41,7 @@ function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/income" element={<Income />} />
               <Route path="/expense" element={<Expense />} />
+              <Route path="/investment" element={<Investment />} />
             </Route>
           </Route>
 

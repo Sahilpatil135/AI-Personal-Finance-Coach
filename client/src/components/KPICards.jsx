@@ -1,5 +1,5 @@
 import React from 'react';
-import { FiTrendingUp, FiTarget, FiDollarSign } from 'react-icons/fi';
+import { FiTrendingUp, FiDollarSign, FiCalendar, FiBriefcase } from 'react-icons/fi';
 
 const KPICards = ({ stats }) => {
   const formatCurrency = (value) => {
@@ -44,7 +44,7 @@ const KPICards = ({ stats }) => {
             <p className="text-xs text-slate-500 mt-1">Current month total</p>
           </div>
           <div className="bg-teal-500/10 p-3 rounded-lg">
-            <FiDollarSign className="text-teal-400 text-2xl" />
+            <FiCalendar className="text-teal-400 text-2xl" />
           </div>
         </div>
       </div>
@@ -76,7 +76,7 @@ const KPICards = ({ stats }) => {
             <p className="text-xs text-slate-500 mt-1">Top income source</p>
           </div>
           <div className="bg-cyan-500/10 p-3 rounded-lg">
-            <FiTarget className="text-cyan-400 text-2xl" />
+            <FiBriefcase className="text-cyan-400 text-2xl" />
           </div>
         </div>
       </div>
