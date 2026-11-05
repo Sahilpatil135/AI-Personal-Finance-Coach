@@ -4,6 +4,43 @@ const dateString = z.string().date();
 const optionalDate = dateString.nullable().optional();
 const positiveNumber = z.number().finite().positive();
 const optionalPositiveNumber = positiveNumber.nullable().optional();
+const optionalNonnegativeNumber = z.number().finite().nonnegative().nullable().optional();
+const goalPriority = z.enum(["LOW", "MEDIUM", "HIGH"]);
+const goalFields = {
+    goal_name: z.string().trim().min(1).max(100),
+    category: z.string().trim().min(1).max(50),
+    description: z.string().nullable().optional(),
+    target_amount: positiveNumber,
+    current_saved: z.number().finite().nonnegative(),
+    start_date: dateString,
+    deadline: dateString,
+    priority: goalPriority
+};
+
+function validateGoalDates(value, context) {
+    if (value.start_date && value.deadline && value.deadline < value.start_date) {
+        context.addIssue({ code: "custom", path: ["deadline"], message: "deadline cannot be before start_date" });
+    }
+}
+
+const goalCreate = z.object({
+    ...goalFields,
+    current_saved: z.number().finite().nonnegative().default(0),
+    status: z.enum(["IN_PROGRESS", "COMPLETED", "CANCELLED"]).default("IN_PROGRESS")
+}).superRefine(validateGoalDates);
+
+const goalUpdate = z.object({
+    goal_name: goalFields.goal_name.optional(),
+    category: goalFields.category.optional(),
+    description: goalFields.description,
+    target_amount: goalFields.target_amount.optional(),
+    current_saved: goalFields.current_saved.optional(),
+    start_date: goalFields.start_date.optional(),
+    deadline: goalFields.deadline.optional(),
+    priority: goalFields.priority.optional(),
+    status: z.enum(["IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional()
+}).superRefine(validateGoalDates);
+
 const contributionFields = {
     contribution_amount: optionalPositiveNumber,
     contribution_frequency: z.enum(["MONTHLY", "YEARLY"]).nullable().optional(),
@@ -34,6 +71,9 @@ const investmentCreate = z.object({
     start_date: optionalDate,
     maturity_date: optionalDate,
     maturity_value: optionalPositiveNumber,
+    current_value: optionalNonnegativeNumber,
+    valuation_date: optionalDate,
+    valuation_method: z.string().trim().min(1).max(20).transform(value => value.toUpperCase()).default("MANUAL"),
     status: z.enum(["ACTIVE", "COMPLETED", "WITHDRAWN"]).default("ACTIVE"),
     goal_id: z.number().int().positive().nullable().optional()
 }).superRefine((value, context) => {
@@ -52,6 +92,9 @@ const investmentUpdate = z.object({
     start_date: optionalDate,
     maturity_date: optionalDate,
     maturity_value: optionalPositiveNumber,
+    current_value: optionalNonnegativeNumber,
+    valuation_date: optionalDate,
+    valuation_method: z.string().trim().min(1).max(20).transform(value => value.toUpperCase()).optional(),
     status: z.enum(["ACTIVE", "COMPLETED", "WITHDRAWN"]).nullable().optional(),
     goal_id: z.number().int().positive().nullable().optional()
 }).superRefine((value, context) => {
@@ -97,6 +140,8 @@ module.exports = {
         date: optionalDate
     }),
     budgetUpdate: z.object({ amount: z.number().finite() }),
+    goalCreate,
+    goalUpdate,
     investmentCreate,
     investmentUpdate,
     withdrawalCreate: z.object({

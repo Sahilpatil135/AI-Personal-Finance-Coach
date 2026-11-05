@@ -44,17 +44,17 @@ export default function InvestmentTable({ data, isLoading, currentPage, totalIte
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[850px]">
+        <table className="w-full min-w-[1050px]">
           <thead className="border-b border-slate-700 bg-slate-800/50">
             <tr>
-              {['Investment', 'Type', 'Initial amount', 'Maturity value', 'Maturity date', 'Status', ''].map((heading) => (
+              {['Investment', 'Type', 'Initial amount', 'Current value', 'Valuation', 'Maturity value', 'Maturity date', 'Status', ''].map((heading) => (
                 <th key={heading} className={`${cell} text-left text-xs font-semibold uppercase tracking-wide text-slate-400`}>{heading}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan="7" className="px-4 py-10 text-center text-slate-500">Loading investments…</td></tr>
+              <tr><td colSpan="9" className="px-4 py-10 text-center text-slate-500">Loading investments…</td></tr>
             ) : filtered.length ? filtered.map((item) => (
               <tr key={item.id} className="border-b border-slate-800/80 transition hover:bg-slate-800/30">
                 <td className={`${cell} font-medium text-slate-100`}>
@@ -64,6 +64,11 @@ export default function InvestmentTable({ data, isLoading, currentPage, totalIte
                 </td>
                 <td className={cell}><span className="rounded-full bg-blue-400/10 px-2.5 py-1 text-xs font-semibold text-blue-200">{item.type}</span></td>
                 <td className={`${cell} font-medium text-slate-200`}>{money(item.initial_amount)}</td>
+                <td className={`${cell} font-semibold text-emerald-300`}>{item.current_value == null ? '—' : money(item.current_value)}</td>
+                <td className={`${cell} text-slate-300`}>
+                  <span className="text-xs">{item.valuation_method || '—'}</span>
+                  <div className="mt-1 text-xs text-slate-500">{date(item.valuation_date)}</div>
+                </td>
                 <td className={`${cell} font-semibold text-blue-300`}>{money(item.maturity_value)}</td>
                 <td className={`${cell} text-slate-300`}>{date(item.maturity_date)}</td>
                 <td className={cell}>
@@ -79,7 +84,7 @@ export default function InvestmentTable({ data, isLoading, currentPage, totalIte
                 </td>
               </tr>
             )) : (
-              <tr><td colSpan="7" className="px-4 py-10 text-center text-sm text-slate-500">{search || status ? 'No investments match your filters' : 'No investments yet. Add one to start tracking your portfolio.'}</td></tr>
+              <tr><td colSpan="9" className="px-4 py-10 text-center text-sm text-slate-500">{search || status ? 'No investments match your filters' : 'No investments yet. Add one to start tracking your portfolio.'}</td></tr>
             )}
           </tbody>
         </table>

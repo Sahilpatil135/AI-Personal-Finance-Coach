@@ -129,6 +129,15 @@ export default function Investment() {
       iconColor: "text-blue-400",
     },
     {
+      title: "Total current value",
+      value: money(summary?.total_current_value),
+      note: "Sum of latest recorded valuations",
+      icon: FiDollarSign,
+      borderColor: "border-l-emerald-500",
+      iconBackground: "bg-emerald-500/10",
+      iconColor: "text-emerald-400",
+    },
+    {
       title: "Expected maturity value",
       value: money(summary?.total_expected_maturity_value),
       note: "Across your full portfolio",
@@ -189,7 +198,7 @@ export default function Investment() {
           </button>
         </header>
 
-        <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
           {statCards.map(
             (
               {

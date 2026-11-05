@@ -32,6 +32,25 @@ export const investmentService = {
     return response.data
   },
 
+  async getAll() {
+    const limit = 100
+    const records = []
+    let skip = 0
+    while (true) {
+      const page = await this.getPaginated(skip, limit)
+      if (!page.records.length) {
+        if (skip < page.total) {
+          throw new Error('Investment pagination did not return any records')
+        }
+        break
+      }
+      records.push(...page.records)
+      skip += page.records.length
+      if (skip >= page.total) break
+    }
+    return records
+  },
+
   async addInvestment(data) {
     const response = await api.post('/api/investments', data)
     return response.data

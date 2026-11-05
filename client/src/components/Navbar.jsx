@@ -29,6 +29,7 @@ const Navbar = () => {
                                 ['Income', '/income'],
                                 ['Expenses', '/expense'],
                                 ['Investments', '/investment'],
+                                ['Goals', '/goals'],
                             ].map(([label, path]) => (
                                 <NavLink
                                     key={path}
@@ -60,6 +61,7 @@ const Navbar = () => {
                         ['Income', '/income'],
                         ['Expenses', '/expense'],
                         ['Investments', '/investment'],
+                        ['Goals', '/goals'],
                     ].map(([label, path]) => (
                         <NavLink
                             key={path}

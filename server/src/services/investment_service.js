@@ -17,6 +17,9 @@ const investmentColumns = [
     "start_date",
     "maturity_date",
     "maturity_value",
+    "current_value",
+    "valuation_date",
+    "valuation_method",
     "status",
     "created_at",
     "updated_at",
@@ -25,6 +28,7 @@ const numericInvestmentFields = [
     "initial_amount",
     "contribution_amount",
     "maturity_value",
+    "current_value",
 ];
 const withdrawalColumns = [
     "id",
@@ -138,6 +142,9 @@ async function createInvestment(data, userId) {
         "start_date",
         "maturity_date",
         "maturity_value",
+        "current_value",
+        "valuation_date",
+        "valuation_method",
         "status",
         "goal_id",
     ];
@@ -145,7 +152,7 @@ async function createInvestment(data, userId) {
         userId,
         data.type,
         data.title,
-        data.initial_amount ?? null,
+        data.initial_amount ?? 0,
         data.contribution_amount ?? null,
         data.contribution_frequency ?? null,
         data.contribution_day ?? null,
@@ -154,6 +161,9 @@ async function createInvestment(data, userId) {
         startDate,
         data.maturity_date ?? null,
         data.maturity_value ?? null,
+        data.current_value ?? null,
+        data.valuation_date ?? null,
+        data.valuation_method,
         data.status,
         data.goal_id ?? null,
     ];
@@ -237,7 +247,25 @@ async function updateInvestment(investmentId, userId, data) {
         contribution_month: data.contribution_month ?? existing.contribution_month,
     });
 
-    const allowed = investmentColumns.slice(2, 15);
+    const editableInvestmentColumns = [
+        "goal_id",
+        "type",
+        "title",
+        "initial_amount",
+        "contribution_amount",
+        "contribution_frequency",
+        "contribution_day",
+        "contribution_month",
+        "term",
+        "start_date",
+        "maturity_date",
+        "maturity_value",
+        "current_value",
+        "valuation_date",
+        "valuation_method",
+        "status",
+    ];
+    const allowed = editableInvestmentColumns;
     const entries = Object.entries(data).filter(([key]) => allowed.includes(key));
     if (!entries.length) return getInvestment(investmentId, userId);
     const values = entries.map(([, value]) => value);
@@ -346,6 +374,7 @@ async function getInvestmentSummary(userId) {
                 COUNT(*) FILTER (WHERE status = 'ACTIVE')::int AS active_investments,
                 COUNT(*) FILTER (WHERE goal_id IS NOT NULL)::int AS goal_linked_investments,
                 COALESCE(SUM(initial_amount), 0) AS total_initial_amount,
+                COALESCE(SUM(current_value), 0) AS total_current_value,
                 COALESCE(SUM(contribution_amount), 0) AS total_recurring_contribution_amount,
                 COALESCE(SUM(maturity_value), 0) AS total_expected_maturity_value
          FROM investments WHERE user_id = $1`,
@@ -358,6 +387,7 @@ async function getInvestmentSummary(userId) {
     return {
         ...rows[0],
         total_initial_amount: Number(rows[0].total_initial_amount),
+        total_current_value: Number(rows[0].total_current_value),
         total_recurring_contribution_amount: Number(
             rows[0].total_recurring_contribution_amount,
         ),

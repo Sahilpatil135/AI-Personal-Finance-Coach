@@ -9,6 +9,9 @@ const initialForm = {
   type: 'FD',
   initial_amount: '',
   maturity_value: '',
+  current_value: '',
+  valuation_date: '',
+  valuation_method: 'MANUAL',
   start_date: new Date().toISOString().slice(0, 10),
   maturity_date: '',
   contribution_amount: '',
@@ -29,6 +32,9 @@ function createForm(editingData) {
     ...editingData,
     initial_amount: editingData.initial_amount ?? '',
     maturity_value: editingData.maturity_value ?? '',
+    current_value: editingData.current_value ?? '',
+    valuation_date: editingData.valuation_date ?? '',
+    valuation_method: editingData.valuation_method ?? 'MANUAL',
     contribution_amount: editingData.contribution_amount ?? '',
     contribution_frequency: editingData.contribution_frequency ?? '',
     contribution_day: editingData.contribution_day ?? '',
@@ -67,6 +73,9 @@ export default function InvestmentForm({ isOpen, onClose, onSubmit, editingData 
         type: form.type,
         initial_amount: numberOrNull(form.initial_amount),
         maturity_value: numberOrNull(form.maturity_value),
+        current_value: numberOrNull(form.current_value),
+        valuation_date: form.valuation_date || null,
+        valuation_method: form.valuation_method.trim(),
         start_date: form.start_date,
         maturity_date: form.maturity_date || null,
         contribution_amount: numberOrNull(form.contribution_amount),
@@ -124,6 +133,17 @@ export default function InvestmentForm({ isOpen, onClose, onSubmit, editingData 
             </label>
             <label className={labelClass}>Expected maturity (₹)
               <input className={inputClass} name="maturity_value" type="number" min="0" step="0.01" value={form.maturity_value} onChange={change} />
+            </label>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <label className={labelClass}>Current value (₹)
+              <input className={inputClass} name="current_value" type="number" min="0" step="0.01" value={form.current_value} onChange={change} />
+            </label>
+            <label className={labelClass}>Valuation date
+              <input className={`${inputClass} scheme-dark`} name="valuation_date" type="date" value={form.valuation_date} onChange={change} />
+            </label>
+            <label className={labelClass}>Valuation method
+              <input className={inputClass} name="valuation_method" value={form.valuation_method} onChange={change} maxLength="20" required />
             </label>
           </div>
           <div className="grid grid-cols-2 gap-4">

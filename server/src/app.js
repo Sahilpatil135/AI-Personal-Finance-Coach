@@ -5,6 +5,7 @@ const authRouter = require("./api/auth");
 const incomeRouter = require("./api/income");
 const expenseRouter = require("./api/expense");
 const investmentRouter = require("./api/investment");
+const goalRouter = require("./api/goal");
 const { notFound, errorHandler } = require("./middleware/errors");
 
 const app = express();
@@ -34,6 +35,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/income", incomeRouter);
 app.use("/api/expense", expenseRouter);
 app.use("/api/investments", investmentRouter);
+app.use("/api/goals", goalRouter);
 app.use(notFound);
 app.use(errorHandler);
 
