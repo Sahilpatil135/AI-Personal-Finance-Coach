@@ -192,7 +192,7 @@ export default function Investment() {
               setEditing(null);
               setFormOpen(true);
             }}
-            className="flex items-center gap-2 rounded-xl bg-blue-400 px-4 py-2.5 font-semibold text-slate-950 shadow-lg shadow-blue-500/10 transition hover:bg-blue-300"
+            className="flex items-center gap-2 rounded-xl bg-blue-500 px-4 py-2.5 font-semibold text-white shadow-lg shadow-blue-500/10 transition hover:bg-blue-400"
           >
             <FiPlus size={18} /> Add investment
           </button>

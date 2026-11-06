@@ -7,10 +7,10 @@ const categories = [
   "Food",
   "Rent",
   "Utilities",
-  "Subscriptions",
+  "Electronics",
   "Entertainment",
   "Stationery",
-  "Tech",
+  "Shopping",
   "Other",
 ];
 
@@ -146,7 +146,7 @@ export default function ExpenseEntryForm({
               type="date"
               value={form.date}
               onChange={change}
-              className="w-full pl-7 pr-4 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500"
+              className="w-full pl-7 pr-4 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500 scheme-dark"
             />
           </div>
           

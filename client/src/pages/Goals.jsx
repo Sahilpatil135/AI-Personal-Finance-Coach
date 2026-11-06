@@ -3,6 +3,7 @@ import { FiCheckCircle, FiClock, FiDollarSign, FiEdit2, FiPlus, FiTarget, FiTras
 import toast from 'react-hot-toast'
 import GoalDetails from '../components/GoalDetails'
 import GoalForm from '../components/GoalForm'
+import GoalProgressBar from '../components/GoalProgressBar'
 import { goalService } from '../services/goalService'
 import { investmentService } from '../services/investmentService'
 
@@ -160,13 +161,20 @@ export default function Goals() {
     <div className="min-h-screen bg-slate-950 p-4 font-sans text-slate-100 sm:p-6">
       <main className="mx-auto max-w-7xl">
         <header className="mb-7 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">Plan with purpose</p>
-            <h1 className="mt-1 text-3xl font-bold text-white">Financial Goals</h1>
-            <p className="mt-1 text-sm text-slate-400">Keep cash allocations distinct from investment valuations.</p>
+          <div className="flex items-center gap-4">
+            <div className="rounded-xl bg-purple-500/20 p-3 text-purple-500">
+              <FiTarget size={24} />
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-300">Plan with purpose</p>
+              <h1 className="mt-1 text-3xl font-bold text-white">Financial Goals</h1>
+              <p className="mt-1 text-sm text-slate-400">Track progress towards every target.</p>
+            </div>
           </div>
-          <button type="button" onClick={() => { setFormGoal(null); setCreating(true) }} className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-4 py-2.5 font-semibold text-slate-950 hover:bg-emerald-300">
-            <FiPlus /> Create goal
+
+          <button type="button" onClick={() => { setFormGoal(null); setCreating(true) }} className="inline-flex items-center gap-2 rounded-xl bg-purple-500 px-4 py-2.5 font-semibold text-white hover:bg-purple-400">
+            <FiPlus size={18} /> Create goal
           </button>
         </header>
 
@@ -210,8 +218,17 @@ export default function Goals() {
                     <span className="text-slate-400">Progress</span>
                     <strong>{goal.completion_percentage}%</strong>
                   </div>
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
-                    <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${goal.completion_percentage}%` }} />
+                  <div className="mt-2">
+                    <GoalProgressBar goal={goal} />
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span className="text-slate-400">Latest investment valuation: {date(goal.valuation_date)}</span>
+                    {(goal.linked_investments || []).some((investment) => {
+                      if (investment.current_value == null) return false
+                      if (!investment.valuation_date) return true
+                      const age = Date.now() - new Date(`${investment.valuation_date}T00:00:00Z`).getTime()
+                      return age > 30 * 24 * 60 * 60 * 1000
+                    }) && <span className="text-amber-300">Valuation may be outdated</span>}
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3">
                     <div><p className="text-xs text-slate-500">Target</p><p className="mt-1 font-medium">{money(goal.target_amount)}</p></div>

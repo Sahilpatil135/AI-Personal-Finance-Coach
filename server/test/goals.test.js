@@ -28,6 +28,9 @@ test("goal progress adds cash allocation and valued investments only", () => {
             current_value: "15500.00",
             valuation_date: "2026-10-01",
             valuation_method: "MANUAL",
+            start_date: "2025-01-01",
+            maturity_date: "2027-01-01",
+            status: "ACTIVE",
         },
         {
             id: 2,
@@ -60,9 +63,13 @@ test("goal progress adds cash allocation and valued investments only", () => {
     assert.equal(result.remaining_amount, 25300);
     assert.equal(result.completion_percentage, 63.86);
     assert.equal(result.valuation_date, "2026-11-01");
+    assert.equal(result.required_monthly_savings, 12650);
     assert.equal(result.days_remaining, 57);
     assert.equal(result.on_track, false);
     assert.equal(result.linked_investments[2].current_value, null);
+    assert.equal(result.linked_investments[0].start_date, "2025-01-01");
+    assert.equal(result.linked_investments[0].maturity_date, "2027-01-01");
+    assert.equal(result.linked_investments[0].status, "ACTIVE");
 });
 
 test("goal progress is capped and remaining amount never becomes negative", () => {

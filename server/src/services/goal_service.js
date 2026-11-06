@@ -29,6 +29,9 @@ const investmentColumns = [
     "current_value",
     "valuation_date",
     "valuation_method",
+    "start_date",
+    "maturity_date",
+    "status",
 ];
 
 function money(value) {
@@ -54,6 +57,12 @@ function calculateGoalProgress(goal, investments, currentDate = isoDate(today())
             valuation_date: investment.valuation_date == null
                 ? null
                 : String(investment.valuation_date).slice(0, 10),
+            start_date: investment.start_date == null
+                ? null
+                : String(investment.start_date).slice(0, 10),
+            maturity_date: investment.maturity_date == null
+                ? null
+                : String(investment.maturity_date).slice(0, 10),
             valuation_source: investment.valuation_method === "ESTIMATED"
                 ? "ESTIMATED"
                 : "USER_REPORTED",
@@ -101,6 +110,12 @@ function calculateGoalProgress(goal, investments, currentDate = isoDate(today())
         unvalued_investment_contributions: money(unvaluedInvestmentContributions),
         total_goal_funds: money(totalGoalFunds),
         remaining_amount: money(Math.max(targetAmount - totalGoalFunds, 0)),
+        required_monthly_savings: daysRemaining < 0
+            ? null
+            : money(
+                Math.max(targetAmount - totalGoalFunds, 0)
+                / Math.max(1, Math.ceil(daysRemaining / 30.4375)),
+            ),
         completion_percentage: Number(completionPercentage.toFixed(2)),
         valuation_date: valuationDates.length ? valuationDates.at(-1) : null,
         days_remaining: daysRemaining,

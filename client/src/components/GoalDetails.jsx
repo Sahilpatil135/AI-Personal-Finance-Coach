@@ -1,14 +1,30 @@
 import { useState } from 'react'
 import { FiLink, FiX } from 'react-icons/fi'
+import GoalProgressBar from './GoalProgressBar'
 
 const money = (value) => `₹${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const date = (value) => value
   ? new Date(`${String(value).slice(0, 10)}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
   : 'Not recorded'
+const isOutdated = (value) => !value
+  || Date.now() - new Date(`${String(value).slice(0, 10)}T00:00:00Z`).getTime() > 30 * 24 * 60 * 60 * 1000
+
+function Detail({ label, children }) {
+  return (
+    <div>
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="mt-1 break-words text-sm font-medium text-slate-100">{children}</p>
+    </div>
+  )
+}
 
 export default function GoalDetails({ goal, availableInvestments, isLoadingInvestments, onClose, onLink, onUnlink }) {
   const [investmentId, setInvestmentId] = useState('')
   const [saving, setSaving] = useState(false)
+  const investments = goal.linked_investments || []
+  const hasOutdatedValuation = investments.some(
+    (investment) => investment.current_value != null && isOutdated(investment.valuation_date),
+  )
 
   const linkInvestment = async () => {
     if (!investmentId) return
@@ -34,71 +50,115 @@ export default function GoalDetails({ goal, availableInvestments, isLoadingInves
           <button type="button" onClick={onClose} aria-label="Close"><FiX size={22} /></button>
         </header>
 
-        <div className="mb-6 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-          <div className="mb-2 flex justify-between text-sm">
-            <span>Goal progress</span>
-            <strong>{goal.completion_percentage}%</strong>
+        <section aria-labelledby="goal-overview-heading" className="mb-6">
+          <h3 id="goal-overview-heading" className="mb-3 text-lg font-semibold">Goal overview</h3>
+          <div className="grid grid-cols-2 gap-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:grid-cols-3">
+            <Detail label="Category">{goal.category}</Detail>
+            <Detail label="Target amount">{money(goal.target_amount)}</Detail>
+            <Detail label="Start date">{date(goal.start_date)}</Detail>
+            <Detail label="Deadline">{date(goal.deadline)}</Detail>
+            <Detail label="Priority">{goal.priority}</Detail>
+            <Detail label="Lifecycle status">{goal.status?.replace('_', ' ')}</Detail>
+            <div className="col-span-2 sm:col-span-3"><Detail label="Description">{goal.description || 'No description provided.'}</Detail></div>
           </div>
-          <div className="h-2.5 overflow-hidden rounded-full bg-slate-800">
-            <div className="h-full rounded-full bg-emerald-400" style={{ width: `${goal.completion_percentage}%` }} />
+        </section>
+
+        <section aria-labelledby="financial-progress-heading" className="mb-6">
+          <h3 id="financial-progress-heading" className="mb-3 text-lg font-semibold">Financial progress</h3>
+          <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+            <div className="mb-2 flex justify-between text-sm">
+              <span>Completion</span>
+              <strong>{goal.completion_percentage}%</strong>
+            </div>
+            <GoalProgressBar goal={goal} />
+            <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <Detail label="Cash allocated">{money(goal.cash_allocated)}</Detail>
+              <Detail label="Linked investment value">{money(goal.linked_investment_value)}</Detail>
+              <Detail label="Total goal funds">{money(goal.total_goal_funds)}</Detail>
+              <Detail label="Remaining amount">{money(goal.remaining_amount)}</Detail>
+              <Detail label="Completion">{goal.completion_percentage}%</Detail>
+              <Detail label="Required monthly savings">
+                {goal.required_monthly_savings == null ? 'Deadline passed' : money(goal.required_monthly_savings)}
+              </Detail>
+              <Detail label="Latest investment valuation">{date(goal.valuation_date)}</Detail>
+            </div>
+            {(hasOutdatedValuation || goal.valuation_date && isOutdated(goal.valuation_date)) && (
+              <p role="status" className="mt-4 rounded-lg border border-amber-500/30 bg-amber-400/5 p-3 text-xs text-amber-200">
+                One or more investment valuations are more than 30 days old or have no valuation date. Their displayed values may no longer be accurate.
+              </p>
+            )}
+            <p className="mt-3 rounded-lg border border-slate-800 bg-slate-900/70 p-3 text-xs text-slate-400">
+              Cash allocation is user-reported. Investment values may be estimated or user-reported and are not guaranteed or necessarily immediately withdrawable. Investments without a current valuation are excluded from goal funds.
+            </p>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-            <div><p className="text-xs text-slate-500">Target</p><p className="mt-1 font-semibold">{money(goal.target_amount)}</p></div>
-            <div><p className="text-xs text-slate-500">Cash allocated (user-reported)</p><p className="mt-1 font-semibold">{money(goal.cash_allocated)}</p></div>
-            <div><p className="text-xs text-slate-500">Linked valued investments</p><p className="mt-1 font-semibold">{money(goal.linked_investment_value)}</p></div>
-            <div><p className="text-xs text-slate-500">Total goal funds</p><p className="mt-1 font-semibold text-emerald-300">{money(goal.total_goal_funds)}</p></div>
-            <div><p className="text-xs text-slate-500">Remaining</p><p className="mt-1 font-semibold">{money(goal.remaining_amount)}</p></div>
-            <div><p className="text-xs text-slate-500">Deadline</p><p className="mt-1 font-semibold">{date(goal.deadline)}</p></div>
-            <div><p className="text-xs text-slate-500">Days remaining</p><p className="mt-1 font-semibold">{goal.days_remaining < 0 ? `${Math.abs(goal.days_remaining)} overdue` : goal.days_remaining}</p></div>
-            <div><p className="text-xs text-slate-500">Latest valuation date</p><p className="mt-1 font-semibold">{date(goal.valuation_date)}</p></div>
+        </section>
+
+        <section aria-labelledby="linked-investments-heading" className="mb-6">
+          <h3 id="linked-investments-heading" className="mb-3 text-lg font-semibold">Linked investments</h3>
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row">
+            <select className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm" value={investmentId} onChange={(event) => setInvestmentId(event.target.value)} disabled={isLoadingInvestments || !availableInvestments.length}>
+              <option value="">{isLoadingInvestments ? 'Loading investments…' : 'Select an unlinked investment'}</option>
+              {availableInvestments.map((investment) => (
+                <option key={investment.id} value={investment.id}>{investment.title} · {investment.type}</option>
+              ))}
+            </select>
+            <button type="button" onClick={linkInvestment} disabled={!investmentId || saving} className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-400 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50">
+              <FiLink />{saving ? 'Linking…' : 'Link investment'}
+            </button>
           </div>
-        </div>
 
-        <div className="mb-5 rounded-xl border border-amber-500/20 bg-amber-400/5 p-3 text-xs text-amber-100/80">
-          Cash allocation is user-reported. Investment values are reported or estimated according to each investment’s valuation method; no valuation is treated as verified. Unvalued initial amounts below are not counted toward goal funds or progress.
-        </div>
-
-        <div className="mb-6 flex flex-col gap-2 sm:flex-row">
-          <select className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm" value={investmentId} onChange={(event) => setInvestmentId(event.target.value)} disabled={isLoadingInvestments || !availableInvestments.length}>
-            <option value="">{isLoadingInvestments ? 'Loading investments…' : 'Select an unlinked investment'}</option>
-            {availableInvestments.map((investment) => (
-              <option key={investment.id} value={investment.id}>{investment.title} · {investment.type}</option>
-            ))}
-          </select>
-          <button type="button" onClick={linkInvestment} disabled={!investmentId || saving} className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-400 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50">
-            <FiLink />{saving ? 'Linking…' : 'Link investment'}
-          </button>
-        </div>
-
-        <h3 className="mb-3 text-lg font-semibold">Linked investments</h3>
-        {goal.linked_investments.length ? (
-          <div className="space-y-3">
-            {goal.linked_investments.map((investment) => (
-              <article key={investment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/50 p-4">
-                <div>
-                  <p className="font-semibold">{investment.title} <span className="ml-1 text-xs font-normal text-slate-400">{investment.type}</span></p>
-                  {investment.current_value == null ? (
-                    <p className="mt-1 text-xs text-slate-400">
-                      No current valuation. Recorded initial contribution: {money(investment.initial_amount)} (not counted as current value).
-                      {investment.contribution_amount != null && ` Scheduled contribution: ${money(investment.contribution_amount)} ${investment.contribution_frequency?.toLowerCase() || ''}.`}
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-xs text-slate-400">
-                      Current value: {money(investment.current_value)} · {investment.valuation_source === 'ESTIMATED' ? 'Estimated' : 'User-reported'} · {investment.valuation_method} · valued {date(investment.valuation_date)}
-                    </p>
+          {investments.length ? (
+            <div className="space-y-3">
+              {investments.map((investment) => (
+                <article key={investment.id} className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+                  <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold">{investment.title} <span className="ml-1 text-xs font-normal text-slate-400">{investment.type}</span></p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Current value: {investment.current_value == null ? 'Not recorded' : money(investment.current_value)}
+                      </p>
+                    </div>
+                    <button type="button" onClick={() => onUnlink(investment.id)} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/10">Unlink</button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <Detail label="Initial amount">{money(investment.initial_amount)}</Detail>
+                    <Detail label="Recorded contributions">Not tracked</Detail>
+                    <Detail label="Valuation method">{investment.valuation_method || 'Not recorded'}</Detail>
+                    <Detail label="Valuation date">{date(investment.valuation_date)}</Detail>
+                    <Detail label="Maturity date">{date(investment.maturity_date)}</Detail>
+                    <Detail label="Investment status">{investment.status || 'Not recorded'}</Detail>
+                    <Detail label="Investment start date">{date(investment.start_date)}</Detail>
+                    {investment.contribution_amount != null && (
+                      <Detail label="Scheduled contribution">
+                        {money(investment.contribution_amount)} {investment.contribution_frequency?.toLowerCase() || ''}
+                      </Detail>
+                    )}
+                  </div>
+                  {investment.current_value != null && isOutdated(investment.valuation_date) && (
+                    <p className="mt-3 text-xs text-amber-300">Valuation may be outdated.</p>
                   )}
-                </div>
-                <button type="button" onClick={() => onUnlink(investment.id)} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/10">Unlink</button>
-              </article>
-            ))}
-          </div>
-        ) : <p className="rounded-xl border border-slate-800 p-5 text-center text-sm text-slate-500">No investments linked to this goal yet.</p>}
+                </article>
+              ))}
+            </div>
+          ) : <p className="rounded-xl border border-slate-800 p-5 text-center text-sm text-slate-500">No investments linked to this goal yet.</p>}
 
-        {goal.unvalued_investment_contributions > 0 && (
-          <p className="mt-4 text-sm text-slate-400">
-            Recorded initial contributions without current valuations: <strong className="text-slate-200">{money(goal.unvalued_investment_contributions)}</strong>. This is reported separately and excluded from goal progress.
+          <p className="mt-3 text-xs text-slate-500">
+            The investment records do not include a contribution history. Scheduled contributions are plans, not recorded transactions, and are not added to goal funds.
           </p>
-        )}
+          {goal.unvalued_investment_contributions > 0 && (
+            <p className="mt-3 text-sm text-slate-400">
+              Initial amounts without current valuations: <strong className="text-slate-200">{money(goal.unvalued_investment_contributions)}</strong>. These are reported separately and excluded from goal progress.
+            </p>
+          )}
+        </section>
+
+        <section aria-labelledby="goal-advice-heading" className="rounded-xl border border-violet-500/20 bg-violet-400/5 p-4">
+          <h3 id="goal-advice-heading" className="font-semibold">AI goal advice</h3>
+          <p className="mt-1 text-sm text-slate-400">Personalized advice for this goal will be available later.</p>
+          <button type="button" disabled title="Coming soon" className="mt-3 rounded-lg bg-violet-400/10 px-3 py-2 text-sm font-semibold text-violet-200 opacity-60">
+            Generate personalized advice · Coming soon
+          </button>
+        </section>
       </section>
     </>
   )
