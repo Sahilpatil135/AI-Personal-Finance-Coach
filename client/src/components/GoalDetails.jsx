@@ -18,7 +18,7 @@ function Detail({ label, children }) {
   )
 }
 
-export default function GoalDetails({ goal, availableInvestments, isLoadingInvestments, onClose, onLink, onUnlink }) {
+export default function GoalDetails({ goal, availableInvestments, isLoadingInvestments, onClose, onLink, onUnlink, onLifecycleStatusChange }) {
   const [investmentId, setInvestmentId] = useState('')
   const [saving, setSaving] = useState(false)
   const investments = goal.linked_investments || []
@@ -58,10 +58,22 @@ export default function GoalDetails({ goal, availableInvestments, isLoadingInves
             <Detail label="Start date">{date(goal.start_date)}</Detail>
             <Detail label="Deadline">{date(goal.deadline)}</Detail>
             <Detail label="Priority">{goal.priority}</Detail>
-            <Detail label="Lifecycle status">{goal.status?.replace('_', ' ')}</Detail>
+            <Detail label="Lifecycle status">{goal.lifecycle_status?.replace('_', ' ')}</Detail>
+            <Detail label="Progress status">{goal.progress_status?.replace('_', ' ') || 'Not applicable'}</Detail>
             <div className="col-span-2 sm:col-span-3"><Detail label="Description">{goal.description || 'No description provided.'}</Detail></div>
           </div>
         </section>
+
+        {goal.lifecycle_status === 'IN_PROGRESS' && (
+          <div className="mb-6 flex flex-wrap gap-2">
+            <button type="button" onClick={() => onLifecycleStatusChange('COMPLETED')} className="rounded-lg bg-emerald-400/10 px-3 py-2 text-sm font-semibold text-emerald-200 hover:bg-emerald-400/20">
+              Mark completed
+            </button>
+            <button type="button" onClick={() => onLifecycleStatusChange('CANCELLED')} className="rounded-lg bg-slate-700 px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-600">
+              Cancel goal
+            </button>
+          </div>
+        )}
 
         <section aria-labelledby="financial-progress-heading" className="mb-6">
           <h3 id="financial-progress-heading" className="mb-3 text-lg font-semibold">Financial progress</h3>
@@ -81,6 +93,20 @@ export default function GoalDetails({ goal, availableInvestments, isLoadingInves
                 {goal.required_monthly_savings == null ? 'Deadline passed' : money(goal.required_monthly_savings)}
               </Detail>
               <Detail label="Latest investment valuation">{date(goal.valuation_date)}</Detail>
+            </div>
+            <div className="mt-5 border-t border-slate-800 pt-4">
+              <h4 className="mb-3 text-sm font-semibold text-slate-200">Goal feasibility estimate · this month to date</h4>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                <Detail label="Monthly income">{money(goal.monthly_income)}</Detail>
+                <Detail label="Monthly expenses">{money(goal.monthly_expenses)}</Detail>
+                <Detail label="Completed contributions not in expenses">{money(goal.completed_monthly_contributions)}</Detail>
+                <Detail label="Available monthly surplus">{money(goal.available_monthly_surplus)}</Detail>
+                <Detail label="Goal requires / month">{goal.required_monthly_savings == null ? 'Deadline passed' : money(goal.required_monthly_savings)}</Detail>
+                <Detail label="Monthly shortfall">{goal.monthly_shortfall == null ? 'Not available' : money(goal.monthly_shortfall)}</Detail>
+              </div>
+              <p className="mt-3 text-xs text-slate-500">
+                Estimate based on recorded transactions for the current calendar month and completed contributions; scheduled payments are excluded. If a completed payment is already recorded as an expense, it is not deducted again. This is not a verified bank balance.
+              </p>
             </div>
             {(hasOutdatedValuation || goal.valuation_date && isOutdated(goal.valuation_date)) && (
               <p role="status" className="mt-4 rounded-lg border border-amber-500/30 bg-amber-400/5 p-3 text-xs text-amber-200">
@@ -122,7 +148,7 @@ export default function GoalDetails({ goal, availableInvestments, isLoadingInves
                   </div>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     <Detail label="Initial amount">{money(investment.initial_amount)}</Detail>
-                    <Detail label="Recorded contributions">Not tracked</Detail>
+                    <Detail label="Completed contributions">{money(investment.completed_contribution_total)}</Detail>
                     <Detail label="Valuation method">{investment.valuation_method || 'Not recorded'}</Detail>
                     <Detail label="Valuation date">{date(investment.valuation_date)}</Detail>
                     <Detail label="Maturity date">{date(investment.maturity_date)}</Detail>
@@ -143,7 +169,7 @@ export default function GoalDetails({ goal, availableInvestments, isLoadingInves
           ) : <p className="rounded-xl border border-slate-800 p-5 text-center text-sm text-slate-500">No investments linked to this goal yet.</p>}
 
           <p className="mt-3 text-xs text-slate-500">
-            The investment records do not include a contribution history. Scheduled contributions are plans, not recorded transactions, and are not added to goal funds.
+            Scheduled contributions are plans, not recorded transactions. Only payments marked completed appear in contribution history; investment valuations, not contribution totals, determine goal funding.
           </p>
           {goal.unvalued_investment_contributions > 0 && (
             <p className="mt-3 text-sm text-slate-400">

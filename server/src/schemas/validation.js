@@ -103,6 +103,14 @@ const investmentUpdate = z.object({
     }
 });
 
+const investmentContributionCreate = z.object({
+    amount: positiveNumber,
+    scheduled_date: dateString,
+    contribution_date: dateString,
+    already_recorded_as_expense: z.boolean().default(false),
+    notes: z.string().max(500).nullable().optional()
+});
+
 module.exports = {
     userCreate: z.object({
         name: z.string(),
@@ -144,6 +152,7 @@ module.exports = {
     goalUpdate,
     investmentCreate,
     investmentUpdate,
+    investmentContributionCreate,
     withdrawalCreate: z.object({
         withdrawal_date: dateString,
         withdrawal_amount: positiveNumber,

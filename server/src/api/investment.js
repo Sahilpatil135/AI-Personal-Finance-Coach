@@ -4,6 +4,7 @@ const { HttpError } = require("../middleware/errors");
 const {
     investmentCreate,
     investmentUpdate,
+    investmentContributionCreate,
     withdrawalCreate,
     withdrawalUpdate
 } = require("../schemas/validation");
@@ -81,6 +82,14 @@ router.get("/upcoming-contributions", async (req, res) => {
 
 router.get("/:investment_id", async (req, res) => {
     res.json(await service.getInvestment(positiveId(req.params.investment_id, "investment_id"), req.user.id));
+});
+
+router.post("/:investment_id/contributions", async (req, res) => {
+    res.status(201).json(await service.createContribution(
+        positiveId(req.params.investment_id, "investment_id"),
+        req.user.id,
+        validate(investmentContributionCreate, req.body),
+    ));
 });
 
 router.put("/:investment_id", async (req, res) => {

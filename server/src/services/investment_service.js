@@ -61,6 +61,28 @@ function serializeInvestment(row, withdrawals = []) {
     return result;
 }
 
+function serializeContribution(row) {
+    return {
+        ...row,
+        id: Number(row.id),
+        investment_id: Number(row.investment_id),
+        amount: Number(row.amount),
+        already_recorded_as_expense: Boolean(row.already_recorded_as_expense),
+    };
+}
+
+const contributionColumns = [
+    "id",
+    "investment_id",
+    "amount",
+    "scheduled_date",
+    "contribution_date",
+    "status",
+    "already_recorded_as_expense",
+    "notes",
+    "created_at",
+];
+
 async function getWithdrawalsForInvestment(investmentId) {
     const { rows } = await pool.query(
         `SELECT ${withdrawalColumns.join(", ")} FROM investment_withdrawals
@@ -177,9 +199,20 @@ async function createInvestment(data, userId) {
 }
 
 async function getInvestment(investmentId, userId) {
-    return investmentWithWithdrawals(
+    const investment = await investmentWithWithdrawals(
         await getInvestmentRow(investmentId, userId),
     );
+    const { rows } = await pool.query(
+        `SELECT ${contributionColumns.join(", ")} FROM investment_contributions
+         WHERE investment_id = $1 ORDER BY contribution_date DESC, id DESC`,
+        [investmentId],
+    );
+    investment.contributions = rows.map(serializeContribution);
+    investment.completed_contribution_total = Number(rows.reduce(
+        (total, contribution) => total + Number(contribution.amount),
+        0,
+    ).toFixed(2));
+    return investment;
 }
 
 async function getPaginatedInvestments(
@@ -301,7 +334,7 @@ async function getUpcomingMaturities(userId, days = 30) {
     return Promise.all(rows.map(investmentWithWithdrawals));
 }
 
-function nextContributionDate(investment, todayDate) {
+function nextContributionDate(investment, todayDate, completedDates = new Set()) {
     const day = investment.contribution_day;
     if (day == null || !investment.contribution_frequency) return null;
     const start = new Date(`${investment.start_date}T00:00:00`);
@@ -317,7 +350,7 @@ function nextContributionDate(investment, todayDate) {
         let month = eligible.getMonth();
         while (true) {
             const scheduled = clampDate(year, month);
-            if (scheduled >= eligible) return scheduled;
+            if (scheduled >= eligible && !completedDates.has(isoDate(scheduled))) return scheduled;
             month += 1;
             if (month === 12) {
                 year += 1;
@@ -333,6 +366,9 @@ function nextContributionDate(investment, todayDate) {
         const month = investment.contribution_month - 1;
         let scheduled = clampDate(year, month);
         if (scheduled < eligible) scheduled = clampDate(++year, month);
+        while (completedDates.has(isoDate(scheduled))) {
+            scheduled = clampDate(++year, month);
+        }
         return scheduled;
     }
     return null;
@@ -348,9 +384,26 @@ async function getUpcomingContributions(userId, days = 30) {
          WHERE user_id = $1 AND status = 'ACTIVE' AND contribution_amount IS NOT NULL`,
         [userId],
     );
+    const investmentIds = rows.map((row) => Number(row.id));
+    const completedDates = new Map(investmentIds.map((id) => [id, new Set()]));
+    if (investmentIds.length) {
+        const { rows: completed } = await pool.query(
+            `SELECT investment_id, scheduled_date FROM investment_contributions
+             WHERE investment_id = ANY($1::int[]) AND status = 'COMPLETED'`,
+            [investmentIds],
+        );
+        for (const contribution of completed) {
+            completedDates.get(Number(contribution.investment_id))
+                .add(String(contribution.scheduled_date).slice(0, 10));
+        }
+    }
     return rows
         .flatMap((row) => {
-            const date = nextContributionDate(row, current);
+            const date = nextContributionDate(
+                row,
+                current,
+                completedDates.get(Number(row.id)),
+            );
             if (!date || date > end) return [];
             return [
                 {
@@ -366,6 +419,69 @@ async function getUpcomingContributions(userId, days = 30) {
         .sort((a, b) =>
             a.next_contribution_date.localeCompare(b.next_contribution_date),
         );
+}
+
+function isScheduledDate(investment, scheduledDate) {
+    const date = new Date(`${scheduledDate}T00:00:00Z`);
+    const startDate = String(investment.start_date).slice(0, 10);
+    if (scheduledDate < startDate) return false;
+    const clampDay = (year, month, day) => Math.min(
+        day,
+        new Date(Date.UTC(year, month + 1, 0)).getUTCDate(),
+    );
+    if (investment.contribution_frequency === "MONTHLY") {
+        return date.getUTCDate() === clampDay(
+            date.getUTCFullYear(),
+            date.getUTCMonth(),
+            Number(investment.contribution_day),
+        );
+    }
+    return investment.contribution_frequency === "YEARLY"
+        && date.getUTCMonth() + 1 === Number(investment.contribution_month)
+        && date.getUTCDate() === clampDay(
+            date.getUTCFullYear(),
+            date.getUTCMonth(),
+            Number(investment.contribution_day),
+        );
+}
+
+async function createContribution(investmentId, userId, data) {
+    const investment = await getInvestmentRow(investmentId, userId);
+    if (investment.status !== "ACTIVE") {
+        throw new HttpError(422, "Contributions can only be recorded for active investments");
+    }
+    if (!investment.contribution_frequency || investment.contribution_day == null) {
+        throw new HttpError(422, "Investment has no contribution schedule");
+    }
+    if (!isScheduledDate(investment, data.scheduled_date)) {
+        throw new HttpError(422, "scheduled_date does not match the investment schedule");
+    }
+    if (data.contribution_date > isoDate(today())) {
+        throw new HttpError(422, "contribution_date cannot be in the future");
+    }
+    try {
+        const { rows } = await pool.query(
+            `INSERT INTO investment_contributions
+                (investment_id, amount, scheduled_date, contribution_date,
+                 already_recorded_as_expense, notes)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING ${contributionColumns.join(", ")}`,
+            [
+                investmentId,
+                data.amount,
+                data.scheduled_date,
+                data.contribution_date,
+                data.already_recorded_as_expense,
+                data.notes ?? null,
+            ],
+        );
+        return serializeContribution(rows[0]);
+    } catch (error) {
+        if (error.code === "23505") {
+            throw new HttpError(409, "This scheduled contribution is already marked as paid");
+        }
+        throw error;
+    }
 }
 
 async function getInvestmentSummary(userId) {
@@ -539,6 +655,7 @@ module.exports = {
     deleteInvestment,
     getUpcomingMaturities,
     getUpcomingContributions,
+    createContribution,
     getInvestmentSummary,
     getInvestmentTypeDistribution,
     createWithdrawal,

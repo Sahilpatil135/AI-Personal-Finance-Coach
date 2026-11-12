@@ -9,6 +9,7 @@ import {
 } from "react-icons/fi";
 import toast from "react-hot-toast";
 import InvestmentForm from "../components/InvestmentForm";
+import InvestmentContributionForm from "../components/InvestmentContributionForm";
 import InvestmentTable from "../components/InvestmentTable";
 import InvestmentTypeChart from "../components/InvestmentTypeChart";
 import { investmentService } from "../services/investmentService";
@@ -42,6 +43,7 @@ export default function Investment() {
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [payingContribution, setPayingContribution] = useState(null);
   const daysThisMonth = upcomingDaysInMonth();
 
   useEffect(() => {
@@ -115,6 +117,24 @@ export default function Investment() {
     } catch (error) {
       console.error("Error deleting investment:", error);
       toast.error("Failed to delete investment");
+    }
+  };
+
+  const saveContribution = async (data) => {
+    try {
+      await investmentService.addCompletedContribution(
+        payingContribution.investment_id,
+        data,
+      );
+      setPayingContribution(null);
+      setIsLoading(true);
+      setRefreshVersion((version) => version + 1);
+      toast.success("Contribution recorded as completed");
+    } catch (error) {
+      console.error("Error recording contribution:", error);
+      toast.error(error.response?.status === 409
+        ? "This scheduled contribution is already marked as paid"
+        : "Failed to record contribution");
     }
   };
 
@@ -256,7 +276,7 @@ export default function Investment() {
               <table className="w-full min-w-[510px]">
                 <thead className="sticky top-0 bg-slate-800/90 backdrop-blur">
                   <tr>
-                    {["Investment", "Type", "Amount", "Date"].map((heading) => (
+                    {["Investment", "Type", "Amount", "Date", ""].map((heading) => (
                       <th
                         key={heading}
                         className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400"
@@ -270,7 +290,7 @@ export default function Investment() {
                   {isLoading ? (
                     <tr>
                       <td
-                        colSpan="4"
+                        colSpan="5"
                         className="px-3 py-8 text-center text-sm text-slate-500"
                       >
                         Loading contributions…
@@ -296,11 +316,20 @@ export default function Investment() {
                         <td className="px-3 py-3 text-sm text-slate-400">
                           {date(item.next_contribution_date)}
                         </td>
+                        <td className="px-3 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setPayingContribution(item)}
+                            className="whitespace-nowrap rounded-lg bg-emerald-400/10 px-2.5 py-1.5 text-xs font-semibold text-emerald-200 hover:bg-emerald-400/20"
+                          >
+                            Mark paid
+                          </button>
+                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="4" className="px-3 py-10 text-center">
+                      <td colSpan="5" className="px-3 py-10 text-center">
                         <FiClock
                           className="mx-auto mb-2 text-slate-600"
                           size={20}
@@ -345,6 +374,13 @@ export default function Investment() {
           }}
           onSubmit={saveInvestment}
           editingData={editing}
+        />
+      )}
+      {payingContribution && (
+        <InvestmentContributionForm
+          contribution={payingContribution}
+          onClose={() => setPayingContribution(null)}
+          onSubmit={saveContribution}
         />
       )}
     </div>

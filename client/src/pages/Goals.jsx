@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FiCheckCircle, FiClock, FiDollarSign, FiEdit2, FiPlus, FiTarget, FiTrash2, FiTrendingUp } from 'react-icons/fi'
+import { FiClock, FiDollarSign, FiEdit2, FiPlus, FiTarget, FiTrash2, FiTrendingUp } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 import GoalDetails from '../components/GoalDetails'
 import GoalForm from '../components/GoalForm'
@@ -123,6 +123,24 @@ export default function Goals() {
     }
   }
 
+  const changeLifecycleStatus = async (goal, status) => {
+    try {
+      await goalService.updateGoal(goal.id, { status })
+      const [nextGoals, nextSummary, detail] = await Promise.all([
+        goalService.getAll(),
+        goalService.getSummary(),
+        goalService.getById(goal.id),
+      ])
+      setGoals(nextGoals)
+      setSummary(nextSummary)
+      setSelectedGoal(detail)
+      toast.success(status === 'COMPLETED' ? 'Goal marked completed' : 'Goal cancelled')
+    } catch (error) {
+      console.error('Error updating goal status:', error)
+      toast.error('Failed to update goal status')
+    }
+  }
+
   const linkInvestment = async (investmentId) => {
     try {
       await investmentService.updateInvestment(investmentId, { goal_id: selectedGoal.id })
@@ -149,12 +167,10 @@ export default function Goals() {
   }
 
   const cards = [
-    { title: 'Total goals', value: summary?.total_goals ?? 0, icon: FiTarget, color: 'text-blue-300', border: 'border-l-blue-400' },
-    { title: 'Active goals', value: summary?.active_goals ?? 0, icon: FiClock, color: 'text-amber-200', border: 'border-l-amber-400' },
-    { title: 'Completed goals', value: summary?.completed_goals ?? 0, icon: FiCheckCircle, color: 'text-emerald-300', border: 'border-l-emerald-400' },
-    { title: 'Total target amount', value: money(summary?.total_target_amount), icon: FiTarget, color: 'text-blue-300', border: 'border-l-blue-400' },
-    { title: 'Total cash allocated', value: money(summary?.total_cash_allocated), icon: FiDollarSign, color: 'text-amber-200', border: 'border-l-amber-400' },
-    { title: 'Linked investment value', value: money(summary?.total_linked_investment_value), icon: FiTrendingUp, color: 'text-emerald-300', border: 'border-l-emerald-400' },
+    { title: 'Goals at risk', value: summary?.total_goals ?? 0, note: 'Total number of goals created', icon: FiTarget, color: 'text-purple-400', background: 'bg-purple-500/10', border: 'border-l-purple-500' },
+    { title: 'Active goals', value: summary?.active_goals ?? 0, note: 'Goals currently in progress', icon: FiClock, color: 'text-teal-400', background: 'bg-teal-500/10', border: 'border-l-orange-500' },
+    { title: 'Overall goal progress', value: `${summary?.overall_goal_progress ?? 0}%`, note: 'Progress across all goals', icon: FiTrendingUp, color: 'text-emerald-400', background: 'bg-emerald-500/10', border: 'border-l-emerald-500' },
+    { title: 'Remaining amount', value: money(summary?.remaining_amount), note: 'Amount needed to reach all goals', icon: FiDollarSign, color: 'text-cyan-400', background: 'bg-cyan-500/10', border: 'border-l-cyan-400' },
   ]
 
   return (
@@ -178,15 +194,18 @@ export default function Goals() {
           </button>
         </header>
 
-        <section aria-label="Goal summary" className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {cards.map(({ title, value, icon: Icon, color, border }) => (
-            <article key={title} className={`rounded-xl border border-slate-800 border-l-4 ${border} bg-slate-900/70 p-4`}>
-              <div className="flex items-center justify-between gap-3">
+        <section aria-label="Goal summary" className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {cards.map(({ title, value, note, icon: Icon, color, background, border }) => (
+            <article key={title} className={`rounded-2xl border border-slate-800/80 border-l-4 ${border} bg-slate-900/60 p-6 shadow-xl`}>
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-slate-400">{title}</p>
-                  <p className={`mt-2 text-xl font-bold ${color}`}>{loading ? '—' : value}</p>
+                  <p className="text-sm font-semibold text-slate-400">{title}</p>
+                  <p className="mt-2 text-2xl font-bold text-white">{loading ? '—' : value}</p>
+                  <p className="mt-1 text-xs text-slate-500">{note}</p>
                 </div>
-                <Icon className={`${color} text-xl`} />
+                <div className={`rounded-lg p-3 ${background}`}>
+                  <Icon className={`${color} text-2xl`} />
+                </div>
               </div>
             </article>
           ))}
@@ -195,7 +214,7 @@ export default function Goals() {
         <section>
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl font-bold">Your goals</h2>
-            {!loading && <span className="text-sm text-slate-500">{goals.length} total</span>}
+            {!loading && <span className="text-sm text-slate-500">Total: {goals.length} goals</span>}
           </div>
           {loading ? (
             <div className="rounded-xl border border-slate-800 bg-slate-900 p-10 text-center text-slate-400">Loading goals…</div>
@@ -210,7 +229,8 @@ export default function Goals() {
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${priorityStyle(goal.priority)}`}>{goal.priority?.toLowerCase()} priority</span>
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${goal.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-300' : goal.status === 'CANCELLED' ? 'bg-slate-700 text-slate-300' : 'bg-blue-400/10 text-blue-200'}`}>{goal.status?.replace('_', ' ').toLowerCase()}</span>
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${goal.lifecycle_status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-300' : goal.lifecycle_status === 'CANCELLED' ? 'bg-slate-700 text-slate-300' : 'bg-blue-400/10 text-blue-200'}`}>Lifecycle: {goal.lifecycle_status?.replace('_', ' ').toLowerCase()}</span>
+                      {goal.progress_status && <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${goal.progress_status === 'ON_TRACK' ? 'bg-emerald-500/10 text-emerald-300' : goal.progress_status === 'NEEDS_ATTENTION' ? 'bg-amber-400/10 text-amber-200' : 'bg-rose-500/10 text-rose-300'}`}>{goal.progress_status.replace('_', ' ').toLowerCase()}</span>}
                     </div>
                   </div>
 
@@ -239,8 +259,8 @@ export default function Goals() {
                     <div><p className="text-xs text-slate-500">Deadline</p><p className="mt-1 font-medium">{date(goal.deadline)}</p></div>
                   </div>
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-3">
-                    <p className={`text-xs font-medium ${goal.on_track ? 'text-emerald-300' : 'text-amber-300'}`}>
-                      {goal.status === 'COMPLETED' ? 'Goal reached' : goal.status === 'CANCELLED' ? 'Cancelled' : goal.on_track ? 'On track' : 'Needs attention'}
+                    <p className={`text-xs font-medium ${goal.lifecycle_status === 'COMPLETED' || goal.progress_status === 'ON_TRACK' ? 'text-emerald-300' : goal.progress_status === 'OVERDUE' || goal.progress_status === 'AT_RISK' ? 'text-rose-300' : 'text-amber-300'}`}>
+                      {goal.lifecycle_status === 'COMPLETED' ? 'Goal reached' : goal.lifecycle_status === 'CANCELLED' ? 'Cancelled' : goal.progress_status?.replace('_', ' ').toLowerCase()}
                       {' · '}
                       {goal.days_remaining < 0 ? `${Math.abs(goal.days_remaining)} days overdue` : `${goal.days_remaining} days left`}
                     </p>
@@ -280,6 +300,7 @@ export default function Goals() {
           onClose={() => setSelectedGoal(null)}
           onLink={linkInvestment}
           onUnlink={unlinkInvestment}
+          onLifecycleStatusChange={(status) => changeLifecycleStatus(selectedGoal, status)}
         />
       )}
     </div>

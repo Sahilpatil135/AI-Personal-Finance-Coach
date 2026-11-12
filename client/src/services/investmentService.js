@@ -61,6 +61,11 @@ export const investmentService = {
     return response.data
   },
 
+  async addCompletedContribution(id, data) {
+    const response = await api.post(`/api/investments/${id}/contributions`, data)
+    return response.data
+  },
+
   async deleteInvestment(id) {
     const response = await api.delete(`/api/investments/${id}`)
     return response.data
