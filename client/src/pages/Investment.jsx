@@ -132,9 +132,13 @@ export default function Investment() {
       toast.success("Contribution recorded as completed");
     } catch (error) {
       console.error("Error recording contribution:", error);
+      const detail = error.response?.data?.detail;
+      const message = Array.isArray(detail)
+        ? detail.map((issue) => issue.message || issue.msg).filter(Boolean).join("; ")
+        : typeof detail === "string" ? detail : null;
       toast.error(error.response?.status === 409
         ? "This scheduled contribution is already marked as paid"
-        : "Failed to record contribution");
+        : message || "Failed to record contribution");
     }
   };
 

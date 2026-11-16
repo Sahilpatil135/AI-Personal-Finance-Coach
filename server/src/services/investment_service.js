@@ -1,6 +1,6 @@
 const { pool } = require("../database/database");
 const { HttpError } = require("../middleware/errors");
-const { today, isoDate } = require("../utils/dates");
+const { today, isoDate, dateKey } = require("../utils/dates");
 
 const investmentColumns = [
     "id",
@@ -242,11 +242,26 @@ async function getPaginatedInvestments(
     );
     values.push(skip, limit);
     const { rows } = await pool.query(
-        `SELECT ${investmentColumns.join(", ")} FROM investments WHERE ${where}
-         ORDER BY created_at DESC, id DESC OFFSET $${values.length - 1} LIMIT $${values.length}`,
+        `SELECT ${investmentColumns.map((column) => `i.${column}`).join(", ")},
+                COALESCE(c.completed_contribution_total, 0) AS completed_contribution_total,
+                COALESCE(c.account_balance_contribution_total, 0) AS account_balance_contribution_total
+         FROM investments i
+         LEFT JOIN LATERAL (
+            SELECT SUM(amount) AS completed_contribution_total,
+                   SUM(amount) FILTER (WHERE already_recorded_as_expense = FALSE)
+                       AS account_balance_contribution_total
+            FROM investment_contributions
+            WHERE investment_id = i.id AND status = 'COMPLETED'
+         ) c ON TRUE
+         WHERE ${where}
+         ORDER BY i.created_at DESC, i.id DESC OFFSET $${values.length - 1} LIMIT $${values.length}`,
         values,
     );
-    const records = await Promise.all(rows.map(investmentWithWithdrawals));
+    const records = await Promise.all(rows.map(async (row) => ({
+        ...await investmentWithWithdrawals(row),
+        completed_contribution_total: Number(row.completed_contribution_total),
+        account_balance_contribution_total: Number(row.account_balance_contribution_total),
+    })));
     return { total: countResult.rows[0].total, skip, limit, records };
 }
 
@@ -337,7 +352,7 @@ async function getUpcomingMaturities(userId, days = 30) {
 function nextContributionDate(investment, todayDate, completedDates = new Set()) {
     const day = investment.contribution_day;
     if (day == null || !investment.contribution_frequency) return null;
-    const start = new Date(`${investment.start_date}T00:00:00`);
+    const start = new Date(`${dateKey(investment.start_date)}T00:00:00`);
     const eligible = start > todayDate ? start : todayDate;
     const clampDate = (year, month) =>
         new Date(
@@ -394,7 +409,7 @@ async function getUpcomingContributions(userId, days = 30) {
         );
         for (const contribution of completed) {
             completedDates.get(Number(contribution.investment_id))
-                .add(String(contribution.scheduled_date).slice(0, 10));
+                .add(dateKey(contribution.scheduled_date));
         }
     }
     return rows
@@ -423,7 +438,7 @@ async function getUpcomingContributions(userId, days = 30) {
 
 function isScheduledDate(investment, scheduledDate) {
     const date = new Date(`${scheduledDate}T00:00:00Z`);
-    const startDate = String(investment.start_date).slice(0, 10);
+    const startDate = dateKey(investment.start_date);
     if (scheduledDate < startDate) return false;
     const clampDay = (year, month, day) => Math.min(
         day,
@@ -459,8 +474,10 @@ async function createContribution(investmentId, userId, data) {
     if (data.contribution_date > isoDate(today())) {
         throw new HttpError(422, "contribution_date cannot be in the future");
     }
+    const client = await pool.connect();
     try {
-        const { rows } = await pool.query(
+        await client.query("BEGIN");
+        const { rows } = await client.query(
             `INSERT INTO investment_contributions
                 (investment_id, amount, scheduled_date, contribution_date,
                  already_recorded_as_expense, notes)
@@ -475,12 +492,26 @@ async function createContribution(investmentId, userId, data) {
                 data.notes ?? null,
             ],
         );
+        const updateResult = await client.query(
+            `UPDATE investments
+             SET current_value = COALESCE(current_value, 0) + $1,
+                 valuation_date = CURRENT_DATE,
+                 valuation_method = 'ESTIMATED',
+                 updated_at = NOW()
+             WHERE id = $2 AND user_id = $3`,
+            [data.amount, investmentId, userId],
+        );
+        if (!updateResult.rowCount) throw new HttpError(404, "Investment not found");
+        await client.query("COMMIT");
         return serializeContribution(rows[0]);
     } catch (error) {
+        await client.query("ROLLBACK");
         if (error.code === "23505") {
             throw new HttpError(409, "This scheduled contribution is already marked as paid");
         }
         throw error;
+    } finally {
+        client.release();
     }
 }
 

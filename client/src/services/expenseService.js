@@ -1,6 +1,11 @@
 import api from "./api";
 
 export const expenseService = {
+    async getAllExpenses() {
+        const response = await api.get("/api/expense");
+        return response.data;
+    },
+
     async getStats() {
         const response = await api.get("/api/expense/stats/overview");
         return response.data;

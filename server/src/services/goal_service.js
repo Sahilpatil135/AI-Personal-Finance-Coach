@@ -344,6 +344,7 @@ function calculateGoalSummary(goals) {
     const totalAccumulatedFunds = goals.reduce((total, goal) => total + goal.total_goal_funds, 0);
     return {
         total_goals: goals.length,
+        risky_goals: goals.filter((goal) => goal.progress_status === "AT_RISK").length,
         active_goals: goals.filter((goal) => goal.status === "IN_PROGRESS").length,
         completed_goals: goals.filter((goal) => goal.status === "COMPLETED").length,
         total_target_amount: money(totalTargetAmount),
