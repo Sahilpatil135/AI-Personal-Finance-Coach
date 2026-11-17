@@ -6,7 +6,8 @@ const {
     investmentUpdate,
     investmentContributionCreate,
     withdrawalCreate,
-    withdrawalUpdate
+    maturityCreate,
+    proceedsAllocationCreate
 } = require("../schemas/validation");
 const service = require("../services/investment_service");
 
@@ -112,6 +113,14 @@ router.post("/:investment_id/withdrawals", async (req, res) => {
     ));
 });
 
+router.post("/:investment_id/maturity", async (req, res) => {
+    res.status(201).json(await service.createMaturity(
+        positiveId(req.params.investment_id, "investment_id"),
+        req.user.id,
+        validate(maturityCreate, req.body),
+    ));
+});
+
 router.get("/:investment_id/withdrawals", async (req, res) => {
     res.json(await service.getWithdrawals(positiveId(req.params.investment_id, "investment_id"), req.user.id));
 });
@@ -124,22 +133,13 @@ router.get("/:investment_id/withdrawals/:withdrawal_id", async (req, res) => {
     ));
 });
 
-router.put("/:investment_id/withdrawals/:withdrawal_id", async (req, res) => {
-    res.json(await service.updateWithdrawal(
+router.post("/:investment_id/withdrawals/:withdrawal_id/allocate", async (req, res) => {
+    res.json(await service.allocateWithdrawalProceeds(
         positiveId(req.params.investment_id, "investment_id"),
         positiveId(req.params.withdrawal_id, "withdrawal_id"),
         req.user.id,
-        validate(withdrawalUpdate, req.body)
+        validate(proceedsAllocationCreate, req.body)
     ));
-});
-
-router.delete("/:investment_id/withdrawals/:withdrawal_id", async (req, res) => {
-    await service.deleteWithdrawal(
-        positiveId(req.params.investment_id, "investment_id"),
-        positiveId(req.params.withdrawal_id, "withdrawal_id"),
-        req.user.id
-    );
-    res.status(204).end();
 });
 
 module.exports = router;

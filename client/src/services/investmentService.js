@@ -66,6 +66,24 @@ export const investmentService = {
     return response.data
   },
 
+  async createWithdrawal(id, data) {
+    const response = await api.post(`/api/investments/${id}/withdrawals`, data)
+    return response.data
+  },
+
+  async recordMaturity(id, data) {
+    const response = await api.post(`/api/investments/${id}/maturity`, data)
+    return response.data
+  },
+
+  async allocateProceeds(investmentId, transactionId, data) {
+    const response = await api.post(
+      `/api/investments/${investmentId}/withdrawals/${transactionId}/allocate`,
+      data,
+    )
+    return response.data
+  },
+
   async deleteInvestment(id) {
     const response = await api.delete(`/api/investments/${id}`)
     return response.data

@@ -33,9 +33,15 @@ const numericInvestmentFields = [
 const withdrawalColumns = [
     "id",
     "investment_id",
+    "transaction_type",
+    "withdrawal_type",
     "withdrawal_date",
     "withdrawal_amount",
+    "actual_received_amount",
     "reason",
+    "allocation_type",
+    "goal_id",
+    "new_investment_id",
     "created_at",
 ];
 
@@ -45,6 +51,11 @@ function serializeWithdrawal(row) {
         id: Number(row.id),
         investment_id: Number(row.investment_id),
         withdrawal_amount: Number(row.withdrawal_amount),
+        actual_received_amount: Number(row.actual_received_amount),
+        goal_id: row.goal_id == null ? null : Number(row.goal_id),
+        new_investment_id: row.new_investment_id == null
+            ? null
+            : Number(row.new_investment_id),
     };
 }
 
@@ -267,6 +278,12 @@ async function getPaginatedInvestments(
 
 async function updateInvestment(investmentId, userId, data) {
     const existing = await getInvestmentRow(investmentId, userId);
+    if (
+        Object.prototype.hasOwnProperty.call(data, "status")
+        && data.status !== existing.status
+    ) {
+        throw new HttpError(422, "Investment status changes must be recorded through a withdrawal or maturity transaction");
+    }
     for (const key of [
         "type",
         "title",
@@ -329,11 +346,33 @@ async function updateInvestment(investmentId, userId, data) {
 }
 
 async function deleteInvestment(investmentId, userId) {
-    await getInvestmentRow(investmentId, userId);
-    await pool.query("DELETE FROM investments WHERE id = $1 AND user_id = $2", [
-        investmentId,
-        userId,
-    ]);
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        const { rows } = await client.query(
+            "SELECT id FROM investments WHERE id = $1 AND user_id = $2 FOR UPDATE",
+            [investmentId, userId],
+        );
+        if (!rows[0]) throw new HttpError(404, "Investment not found");
+        const history = await client.query(
+            `SELECT id FROM investment_withdrawals
+             WHERE investment_id = $1 OR new_investment_id = $1 LIMIT 1`,
+            [investmentId],
+        );
+        if (history.rows[0]) {
+            throw new HttpError(409, "Investments with withdrawal or maturity history cannot be deleted");
+        }
+        await client.query(
+            "DELETE FROM investments WHERE id = $1 AND user_id = $2",
+            [investmentId, userId],
+        );
+        await client.query("COMMIT");
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
 }
 
 async function getUpcomingMaturities(userId, days = 30) {
@@ -342,11 +381,25 @@ async function getUpcomingMaturities(userId, days = 30) {
     until.setDate(until.getDate() + days);
     const { rows } = await pool.query(
         `SELECT ${investmentColumns.join(", ")} FROM investments
-         WHERE user_id = $1 AND status = 'ACTIVE' AND maturity_date >= $2 AND maturity_date <= $3
+         WHERE user_id = $1 AND status = 'ACTIVE' AND maturity_date <= $2
+           AND (
+               UPPER(type) IN ('FD', 'RD')
+               OR UPPER(REPLACE(type, ' ', '')) LIKE '%MUTUALFUND%'
+               OR UPPER(type) LIKE 'MF%'
+           )
          ORDER BY maturity_date ASC`,
-        [userId, isoDate(current), isoDate(until)],
+        [userId, isoDate(until)],
     );
-    return Promise.all(rows.map(investmentWithWithdrawals));
+    return Promise.all(rows.map(async (row) => {
+        const investment = await investmentWithWithdrawals(row);
+        const maturityDate = dateKey(investment.maturity_date);
+        investment.days_until_maturity = Math.floor(
+            (Date.parse(`${maturityDate}T00:00:00Z`)
+                - Date.parse(`${isoDate(current)}T00:00:00Z`))
+                / 86_400_000,
+        );
+        return investment;
+    }));
 }
 
 function nextContributionDate(investment, todayDate, completedDates = new Set()) {
@@ -582,42 +635,248 @@ async function getInvestmentTypeDistribution(userId) {
     }));
 }
 
-async function getWithdrawalRow(investmentId, withdrawalId) {
-    const { rows } = await pool.query(
-        `SELECT ${withdrawalColumns.join(", ")} FROM investment_withdrawals
-         WHERE investment_id = $1 AND id = $2`,
-        [investmentId, withdrawalId],
+function supportsTransactions(investment) {
+    const type = String(investment.type).replace(/[^A-Z0-9]/gi, "").toUpperCase();
+    return type === "FD" || type === "RD"
+        || type.includes("MUTUALFUND") || type.startsWith("MF");
+}
+
+function cents(value) {
+    return Math.round(Number(value) * 100);
+}
+
+async function getInvestmentBalance(client, investment) {
+    if (investment.current_value != null) return cents(investment.current_value);
+    const { rows } = await client.query(
+        `SELECT COALESCE(SUM(amount), 0) AS contributions
+         FROM investment_contributions
+         WHERE investment_id = $1 AND status = 'COMPLETED'`,
+        [investment.id],
     );
-    if (!rows[0]) throw new HttpError(404, "Withdrawal not found");
+    return cents(investment.initial_amount || 0) + cents(rows[0].contributions);
+}
+
+async function lockInvestment(client, investmentId, userId) {
+    const { rows } = await client.query(
+        `SELECT ${investmentColumns.join(", ")} FROM investments
+         WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+        [investmentId, userId],
+    );
+    if (!rows[0]) throw new HttpError(404, "Investment not found");
+    if (!supportsTransactions(rows[0])) {
+        throw new HttpError(422, "Withdrawals and maturity are currently supported for FD, RD, and mutual funds");
+    }
     return rows[0];
 }
 
 async function createWithdrawal(investmentId, userId, data) {
-    const investment = await getInvestmentRow(investmentId, userId);
-    if (data.withdrawal_date < investment.start_date) {
-        throw new HttpError(422, "withdrawal_date cannot be before start_date");
+    if (data.withdrawal_date > isoDate(today())) {
+        throw new HttpError(422, "withdrawal_date cannot be in the future");
     }
     const client = await pool.connect();
     try {
         await client.query("BEGIN");
+        const investment = await lockInvestment(client, investmentId, userId);
+        if (investment.status !== "ACTIVE") {
+            throw new HttpError(422, "Only active investments can be withdrawn");
+        }
+        if (data.withdrawal_date < dateKey(investment.start_date)) {
+            throw new HttpError(422, "withdrawal_date cannot be before start_date");
+        }
+        const availableCents = await getInvestmentBalance(client, investment);
+        const withdrawalCents = cents(data.withdrawal_amount);
+        if (withdrawalCents > availableCents) {
+            throw new HttpError(422, "withdrawal_amount cannot exceed the current investment value");
+        }
+        if (
+            (data.withdrawal_type === "FULL" && withdrawalCents !== availableCents)
+            || (data.withdrawal_type === "PARTIAL" && withdrawalCents >= availableCents)
+        ) {
+            throw new HttpError(422, "Choose full withdrawal for the entire balance and partial withdrawal for less than the entire balance");
+        }
+        const remainingValue = (availableCents - withdrawalCents) / 100;
         const { rows } = await client.query(
-            `INSERT INTO investment_withdrawals (investment_id, withdrawal_date, withdrawal_amount, reason)
-             VALUES ($1, $2, $3, $4) RETURNING ${withdrawalColumns.join(", ")}`,
+            `INSERT INTO investment_withdrawals
+                (investment_id, transaction_type, withdrawal_type, withdrawal_date,
+                 withdrawal_amount, actual_received_amount, reason)
+             VALUES ($1, 'WITHDRAWAL', $2, $3, $4, $5, $6)
+             RETURNING ${withdrawalColumns.join(", ")}`,
             [
                 investmentId,
+                data.withdrawal_type,
                 data.withdrawal_date,
                 data.withdrawal_amount,
+                data.actual_received_amount,
                 data.reason ?? null,
             ],
         );
-        if (data.mark_withdrawn) {
-            await client.query(
-                "UPDATE investments SET status = 'WITHDRAWN', updated_at = NOW() WHERE id = $1",
-                [investmentId],
-            );
-        }
+        const updateResult = await client.query(
+            `UPDATE investments SET current_value = $1,
+                 valuation_date = $2, valuation_method = 'ESTIMATED',
+                 status = $3, updated_at = NOW()
+             WHERE id = $4 AND user_id = $5 AND status = 'ACTIVE'`,
+            [
+                remainingValue,
+                data.withdrawal_date,
+                data.withdrawal_type === "FULL" ? "WITHDRAWN" : "ACTIVE",
+                investmentId,
+                userId,
+            ],
+        );
+        if (!updateResult.rowCount) throw new HttpError(409, "Investment is no longer active");
         await client.query("COMMIT");
         return serializeWithdrawal(rows[0]);
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+async function createMaturity(investmentId, userId, data) {
+    if (data.withdrawal_date > isoDate(today())) {
+        throw new HttpError(422, "Maturity date cannot be in the future");
+    }
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        const investment = await lockInvestment(client, investmentId, userId);
+        if (investment.status !== "ACTIVE") {
+            throw new HttpError(409, "Only active investments can be matured");
+        }
+        if (!investment.maturity_date || dateKey(investment.maturity_date) > isoDate(today())) {
+            throw new HttpError(422, "Investment has not reached its maturity date");
+        }
+        if (data.withdrawal_date < dateKey(investment.maturity_date)) {
+            throw new HttpError(422, "Maturity transaction date cannot be before the maturity date");
+        }
+        const amountRemoved = (await getInvestmentBalance(client, investment)) / 100;
+        if (amountRemoved <= 0) {
+            throw new HttpError(422, "Investment has no remaining balance to mature");
+        }
+        const { rows } = await client.query(
+            `INSERT INTO investment_withdrawals
+                (investment_id, transaction_type, withdrawal_date, withdrawal_amount,
+                 actual_received_amount, reason)
+             VALUES ($1, 'MATURITY', $2, $3, $4, $5)
+             RETURNING ${withdrawalColumns.join(", ")}`,
+            [
+                investmentId,
+                data.withdrawal_date,
+                amountRemoved,
+                data.actual_received_amount,
+                data.reason ?? null,
+            ],
+        );
+        const updateResult = await client.query(
+            `UPDATE investments SET current_value = 0, valuation_date = $1,
+                 valuation_method = 'MANUAL', status = 'COMPLETED', updated_at = NOW()
+             WHERE id = $2 AND user_id = $3 AND status = 'ACTIVE'`,
+            [data.withdrawal_date, investmentId, userId],
+        );
+        if (!updateResult.rowCount) throw new HttpError(409, "Investment is no longer active");
+        await client.query("COMMIT");
+        return serializeWithdrawal(rows[0]);
+    } catch (error) {
+        await client.query("ROLLBACK");
+        if (error.code === "23505") {
+            throw new HttpError(409, "A maturity transaction has already been recorded for this investment");
+        }
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+async function insertProceedsInvestment(client, userId, amount, data, transactionDate) {
+    const goalId = data.goal_id ?? null;
+    if (goalId != null) {
+        const { rows } = await client.query(
+            "SELECT id FROM goals WHERE id = $1 AND user_id = $2",
+            [goalId, userId],
+        );
+        if (!rows[0]) throw new HttpError(404, "Goal not found");
+    }
+    if (data.maturity_date && data.maturity_date < transactionDate) {
+        throw new HttpError(422, "maturity_date cannot be before the investment start date");
+    }
+    const { rows } = await client.query(
+        `INSERT INTO investments
+            (user_id, goal_id, type, title, initial_amount, start_date,
+             maturity_date, maturity_value, current_value, valuation_date,
+             valuation_method, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $5, $6, 'MANUAL', 'ACTIVE')
+         RETURNING id`,
+        [
+            userId,
+            goalId,
+            data.type,
+            data.title,
+            amount,
+            transactionDate,
+            data.maturity_date ?? null,
+            data.maturity_value ?? null,
+        ],
+    );
+    return Number(rows[0].id);
+}
+
+async function allocateWithdrawalProceeds(investmentId, withdrawalId, userId, data) {
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        const { rows } = await client.query(
+            `SELECT w.* FROM investment_withdrawals w
+             JOIN investments i ON i.id = w.investment_id
+             WHERE w.investment_id = $1 AND w.id = $2 AND i.user_id = $3
+             FOR UPDATE OF w`,
+            [investmentId, withdrawalId, userId],
+        );
+        const transaction = rows[0];
+        if (!transaction) throw new HttpError(404, "Investment transaction not found");
+        if (transaction.allocation_type != null) {
+            throw new HttpError(409, "Proceeds have already been allocated");
+        }
+        let goalId = null;
+        let newInvestmentId = null;
+        if (data.allocation_type === "GOAL") {
+            goalId = data.goal_id;
+            const goal = await client.query(
+                "SELECT id FROM goals WHERE id = $1 AND user_id = $2 FOR UPDATE",
+                [goalId, userId],
+            );
+            if (!goal.rows[0]) throw new HttpError(404, "Goal not found");
+            await client.query(
+                `UPDATE goals SET current_saved = current_saved + $1, updated_at = NOW()
+                 WHERE id = $2 AND user_id = $3`,
+                [transaction.actual_received_amount, goalId, userId],
+            );
+        } else if (data.allocation_type === "NEW_INVESTMENT") {
+            newInvestmentId = await insertProceedsInvestment(
+                client,
+                userId,
+                transaction.actual_received_amount,
+                data.new_investment,
+                dateKey(transaction.withdrawal_date),
+            );
+        }
+        const { rows: updated } = await client.query(
+            `UPDATE investment_withdrawals
+             SET allocation_type = $1, goal_id = $2, new_investment_id = $3
+             WHERE investment_id = $4 AND id = $5 AND allocation_type IS NULL
+             RETURNING ${withdrawalColumns.join(", ")}`,
+            [
+                data.allocation_type,
+                goalId,
+                newInvestmentId,
+                investmentId,
+                withdrawalId,
+            ],
+        );
+        if (!updated[0]) throw new HttpError(409, "Proceeds have already been allocated");
+        await client.query("COMMIT");
+        return serializeWithdrawal(updated[0]);
     } catch (error) {
         await client.query("ROLLBACK");
         throw error;
@@ -635,47 +894,13 @@ async function getWithdrawals(investmentId, userId) {
 
 async function getWithdrawal(investmentId, withdrawalId, userId) {
     await getInvestmentRow(investmentId, userId);
-    return serializeWithdrawal(
-        await getWithdrawalRow(investmentId, withdrawalId),
-    );
-}
-
-async function updateWithdrawal(investmentId, withdrawalId, userId, data) {
-    const investment = await getInvestmentRow(investmentId, userId);
-    const withdrawal = await getWithdrawalRow(investmentId, withdrawalId);
-    for (const key of ["withdrawal_date", "withdrawal_amount"]) {
-        if (Object.prototype.hasOwnProperty.call(data, key) && data[key] === null) {
-            throw new HttpError(422, `${key} cannot be null`);
-        }
-    }
-    if (
-        (data.withdrawal_date ?? withdrawal.withdrawal_date) < investment.start_date
-    ) {
-        throw new HttpError(422, "withdrawal_date cannot be before start_date");
-    }
-    const entries = Object.entries(data).filter(([key]) =>
-        ["withdrawal_date", "withdrawal_amount", "reason"].includes(key),
-    );
-    if (!entries.length) return serializeWithdrawal(withdrawal);
-    const values = entries.map(([, value]) => value);
-    const assignments = entries.map(([key], index) => `${key} = $${index + 1}`);
-    values.push(investmentId, withdrawalId);
     const { rows } = await pool.query(
-        `UPDATE investment_withdrawals SET ${assignments.join(", ")}
-         WHERE investment_id = $${values.length - 1} AND id = $${values.length}
-         RETURNING ${withdrawalColumns.join(", ")}`,
-        values,
-    );
-    return serializeWithdrawal(rows[0]);
-}
-
-async function deleteWithdrawal(investmentId, withdrawalId, userId) {
-    await getInvestmentRow(investmentId, userId);
-    await getWithdrawalRow(investmentId, withdrawalId);
-    await pool.query(
-        "DELETE FROM investment_withdrawals WHERE investment_id = $1 AND id = $2",
+        `SELECT ${withdrawalColumns.join(", ")} FROM investment_withdrawals
+         WHERE investment_id = $1 AND id = $2`,
         [investmentId, withdrawalId],
     );
+    if (!rows[0]) throw new HttpError(404, "Investment transaction not found");
+    return serializeWithdrawal(rows[0]);
 }
 
 module.exports = {
@@ -690,8 +915,8 @@ module.exports = {
     getInvestmentSummary,
     getInvestmentTypeDistribution,
     createWithdrawal,
+    createMaturity,
+    allocateWithdrawalProceeds,
     getWithdrawals,
     getWithdrawal,
-    updateWithdrawal,
-    deleteWithdrawal,
 };

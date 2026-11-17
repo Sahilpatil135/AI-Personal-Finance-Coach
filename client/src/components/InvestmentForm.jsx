@@ -2,8 +2,6 @@ import { useState } from 'react'
 import { FiPlus, FiX } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 
-const type = ['FD', 'RD', 'Mutual Fund']
-
 const initialForm = {
   title: '',
   type: 'FD',
@@ -86,7 +84,6 @@ export default function InvestmentForm({ isOpen, onClose, onSubmit, editingData 
           : null,
         term: numberOrNull(form.term),
         goal_id: numberOrNull(form.goal_id),
-        status: form.status,
       })
       onClose()
     } catch {
@@ -120,11 +117,7 @@ export default function InvestmentForm({ isOpen, onClose, onSubmit, editingData 
               <input className={inputClass} name="type" value={form.type} onChange={change} required maxLength="50" />
             </label>
             <label className={labelClass}>Status
-              <select className={inputClass} name="status" value={form.status} onChange={change}>
-                <option value="ACTIVE">Active</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="WITHDRAWN">Withdrawn</option>
-              </select>
+              <input className={inputClass} value={form.status} disabled readOnly />
             </label>
           </div>
           <div className="grid grid-cols-2 gap-4">

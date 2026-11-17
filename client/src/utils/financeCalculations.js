@@ -36,8 +36,26 @@ export function calculateAccountBalance(incomes, expenses, investments) {
     (total, investment) => total + getInvestmentContributionAmount(investment),
     0,
   )
+  const withdrawalProceeds = investments.reduce(
+    (total, investment) => total + (investment.withdrawals || []).reduce((investmentTotal, transaction) => {
+      if (transaction.allocation_type) {
+        return investmentTotal + amount(transaction.actual_received_amount)
+      }
+      return investmentTotal
+    }, 0),
+    0,
+  )
+  const goalAllocatedProceeds = investments.reduce(
+    (total, investment) => total + (investment.withdrawals || []).reduce(
+      (investmentTotal, transaction) => transaction.allocation_type === 'GOAL'
+        ? investmentTotal + amount(transaction.actual_received_amount)
+        : investmentTotal,
+      0,
+    ),
+    0,
+  )
 
-  return Number((totalIncome - totalExpenses - totalInvested).toFixed(2))
+  return Number((totalIncome - totalExpenses - totalInvested + withdrawalProceeds - goalAllocatedProceeds).toFixed(2))
 }
 
 export function calculateCurrentMonthTotal(records, currentDate = new Date()) {

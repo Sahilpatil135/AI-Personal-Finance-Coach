@@ -96,7 +96,7 @@ const Dashboard = () => {
               {isLoading || accountBalance === null ? "—" : money(accountBalance)}
             </p>
             <p className="mt-2 text-xs leading-relaxed text-slate-400">
-              Recorded total income minus expenses and invested contributions: FD principal, RD initial amount plus completed installments, paid Mutual Fund SIPs, and Mutual Fund lumpsum amounts. Contributions already included in expenses are not deducted twice. This is an estimate, not a verified bank balance.
+              Estimate from recorded income, expenses, invested contributions, and investment proceeds allocated to account balance. Proceeds allocated to goals or new investments are excluded from available cash. This is not a verified bank balance.
             </p>
             <p className="mt-2 text-xs leading-relaxed text-amber-200">
               Account balance should not be less than goal funds accumulated, as it will risk goal completion.

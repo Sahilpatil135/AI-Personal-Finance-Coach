@@ -5,6 +5,10 @@ const optionalDate = dateString.nullable().optional();
 const positiveNumber = z.number().finite().positive();
 const optionalPositiveNumber = positiveNumber.nullable().optional();
 const optionalNonnegativeNumber = z.number().finite().nonnegative().nullable().optional();
+const moneyAmount = positiveNumber.refine(
+    value => Math.abs(value * 100 - Math.round(value * 100)) < 0.000001,
+    "Amount must have at most two decimal places",
+).refine(value => value <= 9999999999.99, "Amount exceeds the supported maximum");
 const goalPriority = z.enum(["LOW", "MEDIUM", "HIGH"]);
 const goalFields = {
     goal_name: z.string().trim().min(1).max(100),
@@ -111,6 +115,45 @@ const investmentContributionCreate = z.object({
     notes: z.string().max(500).nullable().optional()
 });
 
+const withdrawalCreate = z.object({
+    withdrawal_date: dateString,
+    withdrawal_type: z.enum(["PARTIAL", "FULL"]),
+    withdrawal_amount: moneyAmount,
+    actual_received_amount: moneyAmount,
+    reason: z.string().max(500).nullable().optional()
+});
+
+const maturityCreate = z.object({
+    withdrawal_date: dateString,
+    actual_received_amount: moneyAmount,
+    reason: z.string().max(500).nullable().optional()
+});
+
+const proceedsAllocationCreate = z.object({
+    allocation_type: z.enum(["ACCOUNT_BALANCE", "GOAL", "NEW_INVESTMENT"]),
+    goal_id: z.number().int().positive().optional(),
+    new_investment: z.object({
+        type: z.enum(["FD", "RD", "MUTUAL FUND"]),
+        title: z.string().trim().min(1).max(255),
+        maturity_date: optionalDate,
+        maturity_value: optionalPositiveNumber,
+        goal_id: z.number().int().positive().nullable().optional()
+    }).optional()
+}).superRefine((value, context) => {
+    if (value.allocation_type === "GOAL" && value.goal_id == null) {
+        context.addIssue({ code: "custom", path: ["goal_id"], message: "Select a goal for this allocation" });
+    }
+    if (value.allocation_type !== "GOAL" && value.goal_id != null) {
+        context.addIssue({ code: "custom", path: ["goal_id"], message: "goal_id is only valid for a goal allocation" });
+    }
+    if (value.allocation_type === "NEW_INVESTMENT" && !value.new_investment) {
+        context.addIssue({ code: "custom", path: ["new_investment"], message: "Investment details are required" });
+    }
+    if (value.allocation_type !== "NEW_INVESTMENT" && value.new_investment) {
+        context.addIssue({ code: "custom", path: ["new_investment"], message: "Investment details are only valid for a new investment allocation" });
+    }
+});
+
 module.exports = {
     userCreate: z.object({
         name: z.string(),
@@ -153,15 +196,7 @@ module.exports = {
     investmentCreate,
     investmentUpdate,
     investmentContributionCreate,
-    withdrawalCreate: z.object({
-        withdrawal_date: dateString,
-        withdrawal_amount: positiveNumber,
-        reason: z.string().max(500).nullable().optional(),
-        mark_withdrawn: z.boolean().default(false)
-    }),
-    withdrawalUpdate: z.object({
-        withdrawal_date: optionalDate,
-        withdrawal_amount: optionalPositiveNumber,
-        reason: z.string().max(500).nullable().optional()
-    })
+    withdrawalCreate,
+    maturityCreate,
+    proceedsAllocationCreate
 };

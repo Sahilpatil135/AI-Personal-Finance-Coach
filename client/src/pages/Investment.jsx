@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  FiCalendar,
   FiClock,
   FiPlus,
   FiTarget,
@@ -10,7 +9,10 @@ import {
 import toast from "react-hot-toast";
 import InvestmentForm from "../components/InvestmentForm";
 import InvestmentContributionForm from "../components/InvestmentContributionForm";
+import InvestmentHistoryModal from "../components/InvestmentHistoryModal";
+import InvestmentDetailsModal from "../components/InvestmentDetailsModal";
 import InvestmentTable from "../components/InvestmentTable";
+import InvestmentTransactionModal from "../components/InvestmentTransactionModal";
 import InvestmentTypeChart from "../components/InvestmentTypeChart";
 import { investmentService } from "../services/investmentService";
 
@@ -44,7 +46,15 @@ export default function Investment() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [payingContribution, setPayingContribution] = useState(null);
+  const [transactionInvestment, setTransactionInvestment] = useState(null);
+  const [transactionMode, setTransactionMode] = useState(null);
+  const [pendingTransaction, setPendingTransaction] = useState(null);
+  const [historyInvestment, setHistoryInvestment] = useState(null);
+  const [viewingInvestment, setViewingInvestment] = useState(null);
   const daysThisMonth = upcomingDaysInMonth();
+  const upcomingMaturities = maturities.filter(
+    (item) => item.days_until_maturity >= 0 && item.days_until_maturity <= 30,
+  );
 
   useEffect(() => {
     let isCurrent = true;
@@ -142,6 +152,17 @@ export default function Investment() {
     }
   };
 
+  const openTransaction = (investment, mode, transaction = null) => {
+    setTransactionInvestment(investment);
+    setTransactionMode(mode);
+    setPendingTransaction(transaction);
+  };
+
+  const refreshInvestments = () => {
+    setIsLoading(true);
+    setRefreshVersion((version) => version + 1);
+  };
+
   const statCards = [
     {
       title: "Total initial amount",
@@ -179,15 +200,6 @@ export default function Investment() {
       iconBackground: "bg-purple-500/10",
       iconColor: "text-purple-400",
     },
-    {
-      title: "Upcoming maturity",
-      value: maturities.length,
-      note: "Within the next 30 days",
-      icon: FiClock,
-      borderColor: "border-l-cyan-500",
-      iconBackground: "bg-cyan-500/10",
-      iconColor: "text-cyan-400",
-    },
   ];
 
   return (
@@ -222,7 +234,7 @@ export default function Investment() {
           </button>
         </header>
 
-        <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {statCards.map(
             (
               {
@@ -260,6 +272,48 @@ export default function Investment() {
             ),
           )}
         </section>
+
+        {!isLoading && upcomingMaturities.length > 0 && (
+          <section className="mb-6 rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-lg">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-white">Investment maturities</h2>
+                <p className="mt-1 text-xs text-slate-400">
+                  Confirm actual proceeds when a maturity is reached. Expected amounts are never added automatically.
+                </p>
+              </div>
+              <span className="rounded-full bg-amber-400/10 px-3 py-1 text-xs font-medium text-amber-200">
+                {upcomingMaturities.filter((item) => item.days_until_maturity === 0).length} due today
+              </span>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              {upcomingMaturities.map((item) => (
+                <article key={item.id} className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+                  <div>
+                    <p className="font-semibold text-slate-100">{item.title}</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {item.days_until_maturity === 0
+                        ? "Matures today"
+                        : `Matures in ${item.days_until_maturity} days`}
+                    </p>
+                    <p className="mt-2 text-sm text-blue-200">
+                      Expected: {money(item.maturity_value ?? item.current_value)}
+                    </p>
+                  </div>
+                  {item.days_until_maturity === 0 && (
+                    <button
+                      type="button"
+                      onClick={() => openTransaction(item, "MATURITY")}
+                      className="rounded-lg bg-amber-400 px-3 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-300"
+                    >
+                      Confirm maturity
+                    </button>
+                  )}
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-[1.15fr_0.85fr]">
           <article className="min-w-0 rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-lg">
@@ -366,6 +420,9 @@ export default function Investment() {
             setFormOpen(true);
           }}
           onDelete={deleteInvestment}
+          onWithdraw={(item) => openTransaction(item, "WITHDRAWAL")}
+          onHistory={(item) => setHistoryInvestment(item)}
+          onView={(item) => setViewingInvestment(item)}
         />
       </main>
 
@@ -385,6 +442,43 @@ export default function Investment() {
           contribution={payingContribution}
           onClose={() => setPayingContribution(null)}
           onSubmit={saveContribution}
+        />
+      )}
+      {transactionInvestment && (
+        <InvestmentTransactionModal
+          key={`${transactionInvestment.id}-${transactionMode}-${pendingTransaction?.id || "new"}`}
+          investment={transactionInvestment}
+          mode={transactionMode}
+          transaction={pendingTransaction}
+          onClose={() => {
+            setTransactionInvestment(null);
+            setPendingTransaction(null);
+          }}
+          onRecorded={refreshInvestments}
+          onComplete={() => {
+            setTransactionInvestment(null);
+            setPendingTransaction(null);
+            refreshInvestments();
+          }}
+        />
+      )}
+      {historyInvestment && (
+        <InvestmentHistoryModal
+          investment={historyInvestment}
+          onClose={() => setHistoryInvestment(null)}
+          onAllocate={(transaction) => {
+            const mode = transaction.transaction_type === "MATURITY"
+              ? "MATURITY"
+              : "WITHDRAWAL";
+            setHistoryInvestment(null);
+            openTransaction(historyInvestment, mode, transaction);
+          }}
+        />
+      )}
+      {viewingInvestment && (
+        <InvestmentDetailsModal
+          investment={viewingInvestment}
+          onClose={() => setViewingInvestment(null)}
         />
       )}
     </div>
